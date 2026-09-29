@@ -1,0 +1,3000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Planet Pop</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#251a6e">
+<link rel="preload" href="vendor/fonts/bangers-latin.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+  /* fonts are served from this site (vendor/fonts, SIL Open Font License), so no visitor data goes to a third party */
+  @font-face { font-family: 'Bangers'; font-style: normal; font-weight: 400; font-display: swap; src: url(vendor/fonts/bangers-latin.woff2) format('woff2'); }
+  @font-face { font-family: 'Comic Neue'; font-style: normal; font-weight: 700; font-display: swap; src: url(vendor/fonts/comic-neue-700-latin.woff2) format('woff2'); }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    background: radial-gradient(circle at 28% 25%, #4a34b8 0%, #251a6e 40%, #0d0930 100%);
+    font-family: 'Comic Neue', 'Comic Sans MS', sans-serif;
+    color: #fff;
+    user-select: none;
+  }
+  #dots {
+    position: fixed; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,.08) 1.3px, transparent 1.8px);
+    background-size: 11px 11px;
+  }
+  canvas { position: fixed; inset: 0; display: block; touch-action: none; }
+  #ui { position: fixed; z-index: 10; left: 16px; top: 14px; right: 16px; pointer-events: none; }
+  .logo {
+    font-family: 'Bangers', Impact, sans-serif; font-size: clamp(34px, 6vw, 58px); letter-spacing: 2px;
+    color: #ffe14d; -webkit-text-stroke: 2px #140d33;
+    text-shadow: 4px 4px 0 #ff4d8d, 7px 7px 0 #140d33;
+    transform: rotate(-3deg); transform-origin: left; display: inline-block;
+  }
+  .logo span { color: #4df0ff; }
+  .btns { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto; }
+  button {
+    position: relative; width: 48px; height: 48px; padding: 0; display: grid; place-items: center;
+    font-size: 24px; line-height: 1;
+    background: #fff; color: #140d33; border: 3px solid #140d33; border-radius: 12px;
+    box-shadow: 4px 4px 0 #140d33; cursor: pointer;
+    transition: transform .08s, box-shadow .08s;
+  }
+  button[data-tip]:hover::after {
+    content: attr(data-tip); position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    white-space: nowrap; background: #140d33; color: #fff; font: 700 13px 'Comic Neue', sans-serif;
+    padding: 4px 9px; border-radius: 8px; pointer-events: none; z-index: 20;
+  }
+  button:hover { transform: translate(-1px,-1px); box-shadow: 5px 5px 0 #140d33; }
+  button:active { transform: translate(3px,3px); box-shadow: 1px 1px 0 #140d33; }
+  button.on { background: #ffe14d; }
+  button .key {
+    position: absolute; top: -8px; right: -8px; min-width: 18px; height: 18px; padding: 0 3px; box-sizing: border-box;
+    border-radius: 9px; background: #140d33; color: #fff; font: 700 11px/18px 'Comic Neue', sans-serif; text-align: center;
+  }
+  #hint {
+    position: fixed; z-index: 10; left: 50%; bottom: 16px; transform: translateX(-50%);
+    background: #fff; color: #140d33; border: 3px solid #140d33; border-radius: 18px;
+    padding: 7px 16px; font-size: 15px; box-shadow: 4px 4px 0 #140d33; max-width: calc(100vw - 60px);
+    text-align: center; pointer-events: none;
+  }
+  #underwater {
+    position: fixed; inset: 0; pointer-events: none; z-index: 5; opacity: 0; transition: opacity .3s;
+    background: linear-gradient(rgba(60,170,240,.22), rgba(10,50,140,.42));
+  }
+  #loading {
+    position: fixed; inset: 0; display: grid; place-items: center; z-index: 30; padding: 16px;
+    font-family: 'Bangers', Impact, sans-serif; font-size: 44px; color: #ffe14d;
+    -webkit-text-stroke: 2px #140d33; text-shadow: 4px 4px 0 #140d33;
+  }
+  /* a friendly stop sign when the game shouldn't run here */
+  .card {
+    max-width: 480px; background: #fff; color: #140d33; border: 3px solid #140d33; border-radius: 16px;
+    box-shadow: 6px 6px 0 #140d33; padding: 20px 22px; text-align: left;
+    font: 700 16px/1.45 'Comic Neue', 'Comic Sans MS', sans-serif; -webkit-text-stroke: 0; text-shadow: none;
+  }
+  .card h2 { margin: 0 0 8px; font: 28px/1.1 'Bangers', Impact, sans-serif; letter-spacing: 1px; color: #ff4d8d; text-wrap: balance; }
+  .card p { margin: 0 0 12px; }
+  .card code { display: block; padding: 8px 10px; margin: 0 0 12px; background: #f1eefb; border-radius: 8px; word-break: break-all; user-select: all; }
+  .card .row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .card button { width: auto; height: auto; padding: 8px 14px; font: 18px 'Bangers', Impact, sans-serif; letter-spacing: 1px; }
+  #paused {
+    position: fixed; inset: 0; z-index: 25; display: grid; place-items: center; cursor: pointer;
+    background: rgba(13, 9, 48, 0.55); color: #ffe14d; font: 40px 'Bangers', Impact, sans-serif;
+    -webkit-text-stroke: 2px #140d33; text-shadow: 4px 4px 0 #140d33; text-align: center; padding: 16px;
+  }
+  #paused[hidden] { display: none; } /* the display: grid above would otherwise override the hidden attribute */
+  #paused small { display: block; font: 700 16px 'Comic Neue', sans-serif; color: #fff; -webkit-text-stroke: 0; text-shadow: none; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="dots"></div>
+<div id="underwater"></div>
+<div id="loading">Building a world…</div>
+<div id="paused" hidden>Paused<small>so it doesn't slow down your other apps · click to carry on</small></div>
+<div id="ui">
+  <div class="logo">Planet <span>Pop!</span></div>
+  <div class="btns">
+    <button data-mode="orbit" class="on" data-tip="Orbit: see the whole planet" aria-label="Orbit: see the whole planet">🌍</button>
+    <button data-mode="plane" data-tip="Ride a plane" aria-label="Ride a plane">✈️</button>
+    <button data-mode="car" data-tip="Ride a car" aria-label="Ride a car">🚗</button>
+    <button data-mode="boat" data-tip="Ride a boat" aria-label="Ride a boat">⛵</button>
+    <button data-mode="balloon" data-tip="Ride a balloon" aria-label="Ride a balloon"><svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><g stroke="#140d33" stroke-width="2" stroke-linejoin="round"><path d="M16 2.5C9.2 2.5 5 7.6 5 13.2c0 5.2 4.8 8.4 7.4 12.3h7.2C22.2 21.6 27 18.4 27 13.2 27 7.6 22.8 2.5 16 2.5z" fill="#ff5d73"/><path d="M16 2.5c-3.4 0-5.2 5.4-5.2 10.7 0 5 1.6 8.6 1.6 12.3h7.2c0-3.7 1.6-7.3 1.6-12.3 0-5.3-1.8-10.7-5.2-10.7z" fill="#ffe14d"/><path d="M12.6 25.5l1.2 2.3M19.4 25.5l-1.2 2.3" fill="none" stroke-width="1.5"/><rect x="12.8" y="27.6" width="6.4" height="3.6" rx="1" fill="#b07a4f"/></g></svg></button>
+    <button data-mode="sub" data-tip="Ride a submarine" aria-label="Ride a submarine"><svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><g stroke="#140d33" stroke-width="2" stroke-linejoin="round"><path d="M17.5 10V4.5h4" fill="none" stroke-width="2.4" stroke-linecap="round"/><path d="M26 18.5l4-4v10z" fill="#ff9f1c"/><rect x="12" y="9" width="9" height="6.5" rx="2" fill="#ffd23f"/><rect x="2.5" y="13" width="25" height="11" rx="5.5" fill="#ffd23f"/><circle cx="9" cy="18.5" r="2.1" fill="#9fe7ff" stroke-width="1.5"/><circle cx="15" cy="18.5" r="2.1" fill="#9fe7ff" stroke-width="1.5"/><circle cx="21" cy="18.5" r="2.1" fill="#9fe7ff" stroke-width="1.5"/></g></svg></button>
+    <button data-mode="fish" data-tip="Be a fish" aria-label="Be a fish">🐟</button>
+    <button data-mode="bird" data-tip="Be a bird" aria-label="Be a bird">🐦</button>
+    <button data-mode="train" data-tip="Ride the train" aria-label="Ride the train">🚂</button>
+    <button data-mode="person" data-tip="Be a person" aria-label="Be a person">🚶</button>
+    <button data-mode="rocket" data-tip="Ride the rocket" aria-label="Ride the rocket">🚀</button>
+    <button id="daynight" class="on" data-tip="Day / night cycle" aria-label="Day / night cycle">☀️</button>
+    <button id="spin" data-tip="Spin the planet" aria-label="Spin the planet">🌀</button>
+    <button id="erupt" data-tip="Make the volcano erupt!" aria-label="Make the volcano erupt">🌋</button>
+    <button id="mute" data-tip="Sound on / off" aria-label="Sound on or off">🔊</button>
+  </div>
+</div>
+<div id="hint">Drag to spin · scroll / pinch to zoom · zoom right in to tilt toward the horizon</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeVertices, mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const V3 = THREE.Vector3, TAU = Math.PI * 2, R = 10;
+
+// ---------- safety checks, before anything heavy ----------
+// The game is graphics-heavy. It stops with a friendly message, instead of risking the rest of the computer, if:
+//  - it's running inside Microsoft Teams' own window (its built-in browser shares Teams' graphics system), or
+//  - there's no graphics chip to use (remote/virtual desktops, or graphics acceleration turned off),
+//    where the browser would draw everything on the processor and make the whole machine sluggish.
+// Adding ?force to the address skips the checks ("Run anyway").
+const FORCE = new URLSearchParams(location.search).has('force');
+function stopWithMessage(title, paragraphs, { showLink = false, runAnyway = false } = {}) {
+  const box = document.getElementById('loading'), card = document.createElement('div');
+  card.className = 'card';
+  const h = document.createElement('h2'); h.textContent = title; card.append(h);
+  for (const t of paragraphs) { const p = document.createElement('p'); p.textContent = t; card.append(p); }
+  const row = document.createElement('div'); row.className = 'row';
+  if (showLink) {
+    const link = location.origin + location.pathname, code = document.createElement('code');
+    code.textContent = link; card.append(code);
+    const copy = document.createElement('button'); copy.textContent = 'Copy link';
+    copy.addEventListener('click', () => {
+      navigator.clipboard.writeText(link).then(() => { copy.textContent = 'Copied!'; })
+        .catch(() => { getSelection().selectAllChildren(code); copy.textContent = 'Press Ctrl+C to copy'; });
+    });
+    row.append(copy);
+  }
+  if (runAnyway) {
+    const go = document.createElement('button'); go.textContent = 'Run anyway';
+    go.addEventListener('click', () => { location.search = 'force'; });
+    row.append(go);
+  }
+  if (row.children.length) card.append(row);
+  box.replaceChildren(card);
+  document.getElementById('ui').hidden = true; document.getElementById('hint').hidden = true;
+  throw new Error('Planet Pop stopped: ' + title); // stop here, before building the world
+}
+function graphicsCheck() {
+  const withGpu = document.createElement('canvas').getContext('webgl2', { failIfMajorPerformanceCaveat: true });
+  if (!withGpu) return document.createElement('canvas').getContext('webgl2') ? 'software' : 'none';
+  const info = withGpu.getExtension('WEBGL_debug_renderer_info');
+  const name = info ? String(withGpu.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
+  withGpu.getExtension('WEBGL_lose_context')?.loseContext(); // free the test context straight away
+  return /SwiftShader|llvmpipe|softpipe|Basic Render|WARP|Software/i.test(name) ? 'software' : 'ok';
+}
+const insideTeams = /\bTeams\/|MSTeams/i.test(navigator.userAgent) || !!(window.chrome && window.chrome.webview);
+if (insideTeams && !FORCE) stopWithMessage('Open Planet Pop in your web browser', [
+  "It looks like this opened inside Microsoft Teams. Planet Pop's 3D graphics are heavy, and running them inside Teams' own window can upset Teams itself.",
+  'Copy the link below into Edge or Chrome instead:'], { showLink: true, runAnyway: true });
+const GRAPHICS = graphicsCheck();
+if (GRAPHICS === 'none') stopWithMessage("Your computer can't show 3D graphics here", [
+  "Planet Pop needs WebGL 2, which isn't available in this browser. This often happens on remote or virtual desktops, or when graphics acceleration is turned off.",
+  'Try a recent version of Edge, Chrome, Firefox or Safari on your own computer.']);
+if (GRAPHICS === 'software' && !FORCE) stopWithMessage('No graphics chip available', [
+  "This browser is drawing graphics without a graphics chip. That's common on remote or virtual desktops, or when graphics acceleration is turned off.",
+  'Planet Pop would run very slowly and could make the whole computer sluggish, so it has stopped here.'], { runAnyway: true });
+
+// ---------- helpers ----------
+let seed = 20260927;
+function rand() {
+  seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+  let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+}
+const rr = (a, b) => a + (b - a) * rand();
+const pick = a => a[Math.floor(rand() * a.length)];
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const angle = (a, b) => Math.acos(clamp(a.dot(b), -1, 1));
+function randDir(v = new V3()) {
+  const u = rand() * 2 - 1, t = rand() * TAU, s = Math.sqrt(1 - u * u);
+  return v.set(s * Math.cos(t), u, s * Math.sin(t));
+}
+function basisOf(c) {
+  const t1 = (Math.abs(c.y) < 0.9 ? new V3(0, 1, 0) : new V3(1, 0, 0)).cross(c).normalize();
+  return [t1, new V3().crossVectors(c, t1)];
+}
+function offsetDir(c, ang, phi) {
+  const [t1, t2] = basisOf(c);
+  return c.clone().multiplyScalar(Math.cos(ang))
+    .addScaledVector(t1, Math.sin(ang) * Math.cos(phi))
+    .addScaledVector(t2, Math.sin(ang) * Math.sin(phi)).normalize();
+}
+
+// ---------- Perlin noise ----------
+const P = new Uint8Array(512);
+{ const p = [...Array(256).keys()];
+  for (let i = 255; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+  for (let i = 0; i < 512; i++) P[i] = p[i & 255]; }
+const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
+function grad(h, x, y, z) { h &= 15; const u = h < 8 ? x : y, v = h < 4 ? y : (h === 12 || h === 14 ? x : z); return ((h & 1) ? -u : u) + ((h & 2) ? -v : v); }
+function noise(x, y, z) {
+  const X = Math.floor(x) & 255, Y = Math.floor(y) & 255, Z = Math.floor(z) & 255;
+  x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z);
+  const u = fade(x), v = fade(y), w = fade(z);
+  const A = P[X] + Y, AA = P[A] + Z, AB = P[A + 1] + Z, B = P[X + 1] + Y, BA = P[B] + Z, BB = P[B + 1] + Z;
+  return lerp(
+    lerp(lerp(grad(P[AA], x, y, z), grad(P[BA], x - 1, y, z), u), lerp(grad(P[AB], x, y - 1, z), grad(P[BB], x - 1, y - 1, z), u), v),
+    lerp(lerp(grad(P[AA + 1], x, y, z - 1), grad(P[BA + 1], x - 1, y, z - 1), u), lerp(grad(P[AB + 1], x, y - 1, z - 1), grad(P[BB + 1], x - 1, y - 1, z - 1), u), v), w);
+}
+function fbm(x, y, z, o) { let s = 0, a = 0.5, f = 1; for (let i = 0; i < o; i++) { s += a * noise(x * f, y * f, z * f); f *= 2.03; a *= 0.5; } return s; }
+
+// ---------- world layout: continents, cities, highways ----------
+const CITY_H = 0.2;
+function baseH(x, y, z) {
+  let h = fbm(x * 1.2 + 3.1, y * 1.2 - 1.7, z * 1.2 + 0.4, 5) * 2.6 + 0.05;
+  if (h > 0.3) {
+    let m = 1 - Math.abs(noise(x * 3.4 + 7.3, y * 3.4 + 1.1, z * 3.4 - 2.9)); m = m * m * m;
+    h += (h - 0.3) * m * 2.6 + (h - 0.3) * 0.4;
+  }
+  return Math.min(h, 3.0);
+}
+const radiusOf = h => h < 0 ? R : R + 0.035 + h * 0.7; // walkable surface: the sea counts as flat water
+const SEA = 2.3;
+const seabedR = h => h < 0 ? R + h * SEA : radiusOf(h); // actual ground, including the sea floor
+
+const cities = [], highways = [];
+for (let t = 0; t < 6000 && cities.length < 6; t++) {
+  const d = randDir(); const h = baseH(d.x, d.y, d.z);
+  if (h < 0.12 || h > 0.8) continue;
+  if (cities.some(c => angle(c.dir, d) < 0.75)) continue;
+  cities.push({ dir: d, r: rr(0.17, 0.24) });
+}
+{
+  const pairs = new Set();
+  cities.forEach((c, i) => {
+    const others = cities.map((o, j) => ({ j, a: angle(c.dir, o.dir) })).filter(o => o.j !== i).sort((a, b) => a.a - b.a);
+    others.slice(0, 2).forEach((o, k) => {
+      if (o.a > (k === 0 ? 1.45 : 1.05)) return;
+      const key = Math.min(i, o.j) + '-' + Math.max(i, o.j);
+      if (pairs.has(key)) return; pairs.add(key);
+      const a = c.dir.clone(), b = cities[o.j].dir.clone();
+      highways.push({ a, b, ia: i, ib: o.j, n: new V3().crossVectors(a, b).normalize(), ang: o.a });
+    });
+  });
+}
+const _q = new V3(), _c = new V3();
+function arcDist(hw, p) {
+  const s = p.dot(hw.n);
+  _q.copy(p).addScaledVector(hw.n, -s); const ql = _q.length(); if (ql < 1e-6) return Math.PI / 2;
+  _q.divideScalar(ql);
+  _c.crossVectors(hw.a, _q);
+  const t = Math.atan2(_c.dot(hw.n), hw.a.dot(_q));
+  if (t >= 0 && t <= hw.ang) return Math.abs(Math.asin(clamp(s, -1, 1)));
+  return Math.min(angle(p, hw.a), angle(p, hw.b));
+}
+let MASK = -1, PAD = null, VOLC = null;
+const VOLC_R = 0.11; // angular radius of the volcano cone
+function terrainH(p) {
+  let h = baseH(p.x, p.y, p.z); MASK = -1;
+  for (const c of cities) {
+    const d = angle(p, c.dir);
+    if (d < c.r + 0.16) { h = lerp(h, CITY_H, smooth(c.r + 0.16, c.r * 1.03, d)); MASK = Math.max(MASK, clamp((c.r * 1.03 - d) * 60, -1, 1)); }
+  }
+  for (const hw of highways) {
+    const d = arcDist(hw, p);
+    if (d < 0.1) h = lerp(h, CITY_H, smooth(0.1, 0.035, d));
+  }
+  if (PAD) {
+    const d = angle(p, PAD.dir);
+    if (d < 0.1) { h = lerp(h, PAD.h, smooth(0.1, 0.045, d)); MASK = Math.max(MASK, clamp((0.04 - d) * 60, -1, 1)); }
+  }
+  if (VOLC) {
+    const d = angle(p, VOLC.dir);
+    if (d < VOLC_R) {
+      const cone = k => Math.pow(1 - k / VOLC_R, 1.4) * 1.6;
+      h = Math.max(h, VOLC.h + (d < 0.025 ? cone(0.025) - (1 - d / 0.025) * 0.35 : cone(d))); // cone with a crater
+    }
+  }
+  return h;
+}
+const surfaceR = p => radiusOf(terrainH(p));
+function onRoad(p, m) {
+  for (const hw of highways) if (arcDist(hw, p) < m) return true;
+  for (const c of cities) if (Math.abs(angle(p, c.dir) - c.r * 0.95) < m) return true;
+  return false;
+}
+// anything that should keep things from being built there: roads, pad, volcano, the equator railway
+function nearRoad(p, m) {
+  if (onRoad(p, m)) return true;
+  if (Math.abs(p.y) < 0.014 + m) return true;
+  if (iceTag(p) && !cities.some(c => angle(p, c.dir) < c.r + 0.2)) return true; // polar ice: nothing grows or gets built there, except inside a city
+  if (PAD && angle(p, PAD.dir) < 0.06 + m) return true;
+  if (VOLC && angle(p, VOLC.dir) < VOLC_R + m) return true;
+  return false;
+}
+// polar ice caps: small wobbly-edged caps; 0 = none, 1 = pale edge, 2 = white.
+// iceField is a smooth signed value (0 at the edge, 1 where the pale rim turns white) so edges render cleanly.
+// Caps cover both poles no matter what; a polar city keeps its paved ground and buildings, surrounded by ice.
+function iceField(p) {
+  const lon = Math.atan2(p.z, p.x), lat = Math.abs(p.y);
+  const edge = 0.955 + 0.012 * Math.sin(lon * 7) + 0.006 * Math.sin(lon * 17 + 1.3);
+  return clamp((lat - edge) * 60, -1, 2);
+}
+const iceTag = p => { const f = iceField(p); return f > 1 ? 2 : f > 0 ? 1 : 0; };
+// launch pad: flat land away from cities, near the moon's orbital plane so launch windows come round
+const MOON_ORBIT_N = new V3(0, -1088, 306).normalize();
+for (let t = 0; t < 8000 && !PAD; t++) {
+  const d = randDir(), h = baseH(d.x, d.y, d.z);
+  if (h < 0.15 || h > 0.6 || Math.abs(d.dot(MOON_ORBIT_N)) > 0.35 || Math.abs(d.y) < 0.05) continue;
+  if (cities.some(c => angle(d, c.dir) < c.r + 0.3) || highways.some(hw => arcDist(hw, d) < 0.15)) continue;
+  PAD = { dir: d, h };
+}
+if (!PAD) PAD = { dir: new V3(1, 0, 0), h: 0.3 };
+PAD.r = radiusOf(PAD.h);
+// volcano: on land, well away from cities, roads and the launch pad
+for (let t = 0; t < 8000 && !VOLC; t++) {
+  const d = randDir(), h = baseH(d.x, d.y, d.z);
+  if (h < 0.1 || h > 0.9 || angle(d, PAD.dir) < 0.45 || Math.abs(d.y) < VOLC_R + 0.04) continue;
+  if (cities.some(c => angle(d, c.dir) < c.r + 0.4) || highways.some(hw => arcDist(hw, d) < 0.2)) continue;
+  VOLC = { dir: d, h };
+}
+if (!VOLC) VOLC = { dir: new V3(0, 1, 0), h: 0.3 };
+[VOLC.t1, VOLC.t2] = basisOf(VOLC.dir);
+// 0 = normal ground, 1 = volcanic rock, 2 = lava (crater lake + three wiggly streams)
+function volcTag(p) {
+  const d = angle(p, VOLC.dir);
+  if (d > VOLC_R * 0.92) return 0;
+  if (d < 0.021) return 2;
+  const az = Math.atan2(p.dot(VOLC.t2), p.dot(VOLC.t1));
+  for (let k = 0; k < 3; k++) {
+    const a0 = k * TAU / 3 + 0.6 + Math.sin(d * 70 + k) * 0.25;
+    const da = Math.abs(((az - a0) % TAU + TAU * 1.5) % TAU - Math.PI);
+    if (d < VOLC_R * 0.8 && d * da < 0.0085 * (1.15 - d / (VOLC_R * 0.85))) return 2;
+  }
+  return 1;
+}
+
+// ---------- renderer / scene ----------
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, failIfMajorPerformanceCaveat: !FORCE }); }
+catch { stopWithMessage("Planet Pop couldn't start its 3D graphics", ['Your browser refused to create a 3D view. Closing other graphics-heavy tabs or restarting the browser may help.'], { runAnyway: !FORCE }); }
+// Quality levels. The game starts at the top and steps down by itself if frames are coming too slowly.
+const QUALITY = [
+  { dpr: 1.5, fps: 60 },              // sharp, smooth
+  { dpr: 1.0, fps: 60 },              // lower resolution
+  { dpr: 0.8, fps: 30, lite: true },  // half the frame rate; hide underwater decoration
+  { dpr: 0.6, fps: 30, lite: true },  // lowest
+];
+let quality = GRAPHICS === 'software' ? 3 : 0; // "Run anyway" without a graphics chip starts at the lowest level
+const liteMeshes = []; // decoration hidden at the lower quality levels
+renderer.setPixelRatio(Math.min(devicePixelRatio, QUALITY[quality].dpr));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x000000, 0);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const world = new THREE.Group(); // the planet and everything on it; rotates when spinning
+scene.add(world);
+let spinning = false;
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 420);
+camera.position.set(0, 9, 34);
+
+const U = {
+  uLight: { value: new V3(1, 0.35, 0.5).normalize() },
+  uTime: { value: 0 },
+  uDot: { value: 5 * renderer.getPixelRatio() },
+  uRes: { value: new THREE.Vector2() },
+};
+renderer.getDrawingBufferSize(U.uRes.value);
+
+// ---------- comic shaders ----------
+const comicVS = /* glsl */`
+varying vec3 vN; varying vec3 vWP; varying vec3 vCol;
+#ifdef TERRAIN
+attribute float aH; attribute float aMask; attribute float aVolc; attribute float aIce; varying float vH; varying float vMask; varying float vVolc; varying float vIce;
+#endif
+#ifdef WINDOWS
+varying vec3 vLocal; varying vec3 vLN; varying float vTop; varying float vSeed;
+#endif
+void main() {
+  mat4 m = modelMatrix;
+  #ifdef USE_INSTANCING
+  m = m * instanceMatrix;
+  #endif
+  vCol = vec3(1.0);
+  #ifdef USE_INSTANCING_COLOR
+  vCol *= instanceColor;
+  #endif
+  #ifdef USE_COLOR
+  vCol *= color;
+  #endif
+  vec4 wp = m * vec4(position, 1.0);
+  vWP = wp.xyz;
+  vN = normalize(mat3(m) * normal);
+  #ifdef WINDOWS
+  vec3 sc = vec3(length(m[0].xyz), length(m[1].xyz), length(m[2].xyz));
+  vLocal = position * sc; vLN = normal; vTop = sc.y;
+  vSeed = fract(m[3].x * 13.17 + m[3].y * 7.71 + m[3].z * 3.37);
+  #endif
+  #ifdef TERRAIN
+  vH = aH; vMask = aMask; vVolc = aVolc; vIce = aIce;
+  #endif
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}`;
+const comicFS = /* glsl */`
+uniform vec3 uColor; uniform vec3 uLight; uniform float uTime; uniform float uDot;
+#ifdef TERRAIN
+uniform vec3 uPal[10];
+varying float vH; varying float vMask; varying float vVolc; varying float vIce;
+#endif
+#ifdef WINDOWS
+varying vec3 vLocal; varying vec3 vLN; varying float vTop; varying float vSeed;
+#endif
+varying vec3 vN; varying vec3 vWP; varying vec3 vCol;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float halftone(float k) {
+  vec2 p = gl_FragCoord.xy / uDot;
+  p = vec2(p.x + p.y, p.x - p.y) * 0.7071;
+  return 1.0 - step(k, length(fract(p) - 0.5));
+}
+void main() {
+  vec3 N = normalize(vN);
+  if (!gl_FrontFacing) N = -N;
+  vec3 base = uColor * vCol;
+  vec3 up = normalize(vWP);
+  float night = smoothstep(0.05, -0.2, dot(up, uLight));
+  #ifdef TERRAIN
+  float h = vH;
+  float slope = dot(N, up);
+  if (h < -0.9) base = uPal[0];
+  else if (h < -0.4) base = uPal[1];
+  else if (h < -0.08) base = uPal[2];
+  else if (h < 0.0) base = uPal[3];
+  else if (h < 0.1) base = uPal[4];
+  else if (h < 0.95) base = uPal[5];
+  else if (h < 1.5) base = uPal[6];
+  else if (h < 2.1) base = uPal[7];
+  else base = uPal[8];
+  if (h > 0.45 && h < 2.1 && slope < 0.82) base = uPal[7];
+  if (vIce > 1.0) base = vec3(0.92, 0.97, 1.0);
+  else if (vIce > 0.0) base = vec3(0.62, 0.82, 0.96);
+  if (vMask > 0.0) base = uPal[9];
+  if (vVolc > 0.5) base = vec3(0.075, 0.05, 0.11);
+  #endif
+  float d = dot(N, uLight);
+  vec3 col;
+  if (d > 0.22) col = base;
+  else if (d > -0.12) col = base * 0.78 * (1.0 - 0.2 * halftone(0.3));
+  else col = base * vec3(0.30, 0.34, 0.60) * (1.0 - 0.3 * halftone(0.36));
+  #ifdef TERRAIN
+  if (vVolc > 1.5) col = mix(vec3(1.0, 0.22, 0.02), vec3(1.0, 0.72, 0.1), 0.5 + 0.5 * sin(uTime * 3.0 + vWP.x * 9.0 + vWP.y * 7.0 - vWP.z * 5.0));
+  #endif
+  #ifdef WINDOWS
+  if (abs(vLN.y) < 0.5) {
+    float u = abs(vLN.x) > 0.5 ? vLocal.z : vLocal.x;
+    float v = vLocal.y;
+    vec2 cell = vec2(u / 0.05, v / 0.065);
+    vec2 f = fract(cell);
+    if (f.x > 0.26 && f.x < 0.74 && f.y > 0.3 && f.y < 0.76 && v > 0.05 && v < vTop - 0.03) {
+      float lit = step(0.42, hash(floor(cell) + vec2(vSeed * 91.0, vLN.x * 3.0 + vLN.z * 5.0)));
+      vec3 glass = vec3(0.10, 0.16, 0.32) * (d > 0.22 ? 1.4 : 0.8);
+      col = mix(glass, mix(glass * 0.6, vec3(1.0, 0.78, 0.25), lit), night);
+    }
+  }
+  #endif
+  gl_FragColor = vec4(col, 1.0);
+  #include <colorspace_fragment>
+}`;
+const outlineVS = /* glsl */`
+attribute vec3 aOutlineNormal;
+uniform float uWidth; uniform float uRef; uniform vec2 uRes;
+void main() {
+  mat4 m = modelMatrix;
+  #ifdef USE_INSTANCING
+  m = m * instanceMatrix;
+  #endif
+  vec4 wp = m * vec4(position, 1.0);
+  vec3 wn = normalize(mat3(m) * aOutlineNormal);
+  vec4 clip = projectionMatrix * viewMatrix * wp;
+  vec2 dir = (projectionMatrix * viewMatrix * vec4(wn, 0.0)).xy;
+  dir = length(dir) > 1e-5 ? normalize(dir) : vec2(0.0);
+  float px = uWidth * clamp(uRef / max(clip.w, 1e-3), 0.25, 1.0);
+  clip.xy += dir * px * 2.0 / uRes * clip.w;
+  gl_Position = clip;
+}`;
+
+function comicMat(color = '#ffffff', o = {}) {
+  const defines = {};
+  if (o.windows) defines.WINDOWS = '';
+  if (o.terrain) defines.TERRAIN = '';
+  const uniforms = { uColor: { value: new THREE.Color(color) }, uLight: U.uLight, uTime: U.uTime, uDot: U.uDot };
+  if (o.terrain) uniforms.uPal = { value: o.terrain.map(c => new THREE.Color(c)) };
+  const m = new THREE.ShaderMaterial({ uniforms, defines, vertexShader: comicVS, fragmentShader: comicFS, vertexColors: !!o.vertexColors, side: o.side || THREE.FrontSide });
+  if (o.offset) { m.polygonOffset = true; m.polygonOffsetFactor = -o.offset; m.polygonOffsetUnits = -o.offset * 2; }
+  return m;
+}
+const outlineCache = {};
+function outlineMat(px, ref) {
+  const k = px + '|' + ref;
+  return outlineCache[k] ||= new THREE.ShaderMaterial({
+    uniforms: { uWidth: { value: px }, uRef: { value: ref }, uRes: U.uRes },
+    vertexShader: outlineVS,
+    fragmentShader: 'void main(){ gl_FragColor = vec4(0.055, 0.035, 0.13, 1.0); }',
+    side: THREE.BackSide,
+  });
+}
+function addOutlineNormals(geo) {
+  if (!geo.attributes.normal) geo.computeVertexNormals();
+  const p = geo.attributes.position, n = geo.attributes.normal, map = new Map(), out = new Float32Array(p.count * 3);
+  const key = i => `${p.getX(i).toFixed(4)},${p.getY(i).toFixed(4)},${p.getZ(i).toFixed(4)}`;
+  for (let i = 0; i < p.count; i++) {
+    const k = key(i); let a = map.get(k); if (!a) map.set(k, a = [0, 0, 0]);
+    a[0] += n.getX(i); a[1] += n.getY(i); a[2] += n.getZ(i);
+  }
+  for (let i = 0; i < p.count; i++) {
+    const a = map.get(key(i)), l = Math.hypot(a[0], a[1], a[2]) || 1;
+    out[i * 3] = a[0] / l; out[i * 3 + 1] = a[1] / l; out[i * 3 + 2] = a[2] / l;
+  }
+  geo.setAttribute('aOutlineNormal', new THREE.BufferAttribute(out, 3));
+  return geo;
+}
+function outline(mesh, px = 2, ref = 3) {
+  const geo = mesh.geometry;
+  if (!geo.attributes.aOutlineNormal) addOutlineNormals(geo);
+  let o;
+  if (mesh.isInstancedMesh) {
+    o = new THREE.InstancedMesh(geo, outlineMat(px, ref), mesh.count);
+    o.instanceMatrix = mesh.instanceMatrix; o.frustumCulled = false;
+  } else o = new THREE.Mesh(geo, outlineMat(px, ref));
+  mesh.add(o);
+  return mesh;
+}
+function makeInstanced(geo, mat, n, px, ref = 3) {
+  const m = new THREE.InstancedMesh(geo, mat, n);
+  m.frustumCulled = false;
+  m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  if (px) outline(m, px, ref);
+  world.add(m);
+  return m;
+}
+function finalize(m, count) {
+  m.count = count; m.children.forEach(c => c.count = count);
+  m.instanceMatrix.needsUpdate = true;
+  if (m.instanceColor) m.instanceColor.needsUpdate = true;
+}
+const Y = new V3(0, 1, 0);
+function surfaceMatrix(dir, radius, yaw, sx, sy, sz) {
+  const q = new THREE.Quaternion().setFromUnitVectors(Y, dir).multiply(new THREE.Quaternion().setFromAxisAngle(Y, yaw));
+  return new THREE.Matrix4().compose(dir.clone().multiplyScalar(radius), q, new V3(sx, sy, sz));
+}
+const _m = new THREE.Matrix4(), _x = new V3(), _col = new THREE.Color();
+function frameMatrix(pos, up, fwd, s = 1) {
+  _x.crossVectors(up, fwd).normalize();
+  return _m.makeBasis(_x.multiplyScalar(s), up.clone().multiplyScalar(s), fwd.clone().multiplyScalar(s)).setPosition(pos);
+}
+
+// ---------- horizon culling: don't draw what's round the back of the planet ----------
+const horizonMeshes = [];      // pieces of the terrain and ocean: { mesh, dir, spread }
+const cullableInstances = [];  // static instanced decoration (trees, coral, seaweed)
+// cut an indexed sphere-like geometry into 6*n*n pieces (a cube-face grid). The pieces share the vertex data;
+// each gets its own bounds, so the renderer can also skip pieces that are off-screen.
+function splitIntoPieces(geo, n = 2) {
+  const idx = geo.index.array, p = geo.attributes.position.array, buckets = new Map();
+  for (let t = 0; t < idx.length; t += 3) {
+    let x = 0, y = 0, z = 0;
+    for (let k = 0; k < 3; k++) { const v = idx[t + k] * 3; x += p[v]; y += p[v + 1]; z += p[v + 2]; }
+    const ax = Math.abs(x), ay = Math.abs(y), az = Math.abs(z);
+    let f, u, w;
+    if (ax >= ay && ax >= az) { f = x > 0 ? 0 : 1; u = y / ax; w = z / ax; }
+    else if (ay >= az) { f = y > 0 ? 2 : 3; u = x / ay; w = z / ay; }
+    else { f = z > 0 ? 4 : 5; u = x / az; w = y / az; }
+    const key = (f * n + Math.min(n - 1, Math.floor((w + 1) / 2 * n))) * n + Math.min(n - 1, Math.floor((u + 1) / 2 * n));
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(idx[t], idx[t + 1], idx[t + 2]);
+  }
+  return [...buckets.values()].map(list => {
+    const g = new THREE.BufferGeometry();
+    for (const [name, attr] of Object.entries(geo.attributes)) g.setAttribute(name, attr);
+    g.setIndex(new THREE.BufferAttribute(Uint32Array.from(list), 1));
+    const c = new V3(), v = new V3();
+    for (const i of list) c.add(v.fromArray(p, i * 3));
+    c.divideScalar(list.length);
+    const dir = c.clone().normalize();
+    let r = 0, spread = 0;
+    for (const i of list) { v.fromArray(p, i * 3); r = Math.max(r, v.distanceTo(c)); spread = Math.max(spread, angle(dir, v.clone().normalize())); }
+    g.boundingSphere = new THREE.Sphere(c, r);
+    return { geo: g, dir, spread };
+  });
+}
+
+// ---------- planet ----------
+let terrainGeo;
+{
+  let geo = new THREE.IcosahedronGeometry(1, 84);
+  geo.deleteAttribute('normal'); geo.deleteAttribute('uv');
+  geo = mergeVertices(geo);
+  const pos = geo.attributes.position, hA = new Float32Array(pos.count), mA = new Float32Array(pos.count), vA = new Float32Array(pos.count), iA = new Float32Array(pos.count), v = new V3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i).normalize();
+    const h = terrainH(v); hA[i] = h; mA[i] = MASK; vA[i] = volcTag(v); iA[i] = iceField(v);
+    v.multiplyScalar(seabedR(h)); pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  geo.setAttribute('aH', new THREE.BufferAttribute(hA, 1));
+  geo.setAttribute('aMask', new THREE.BufferAttribute(mA, 1));
+  geo.setAttribute('aVolc', new THREE.BufferAttribute(vA, 1));
+  geo.setAttribute('aIce', new THREE.BufferAttribute(iA, 1));
+  geo.setAttribute('aOutlineNormal', geo.attributes.normal);
+  const pal = ['#22407f', '#2f6fae', '#f5d77a', '#ffe28a', '#ffe28a', '#86e05a', '#3fae4a', '#a3785a', '#ffffff', '#ddd5c6'];
+  const terrainMat = comicMat('#fff', { terrain: pal });
+  for (const piece of splitIntoPieces(geo)) { // drawn in pieces so the far side and off-screen parts can be skipped
+    const m = new THREE.Mesh(piece.geo, terrainMat);
+    outline(m, 3.2, 1e4);
+    world.add(m);
+    horizonMeshes.push({ mesh: m, dir: piece.dir, spread: piece.spread });
+  }
+  terrainGeo = geo; // the whole mesh is kept (not drawn) for exact ground-height lookups
+}
+// exact height of the rendered terrain along a direction: ray-cast against the planet mesh,
+// using a cube-map grid of triangle buckets so each query only tests a handful of triangles
+let groundR;
+{
+  const pos = terrainGeo.attributes.position.array, idx = terrainGeo.index.array, GB = 48, cells = [];
+  const cellOf = (x, y, z) => {
+    const ax = Math.abs(x), ay = Math.abs(y), az = Math.abs(z);
+    let f, u, v;
+    if (ax >= ay && ax >= az) { f = x > 0 ? 0 : 1; u = y / ax; v = z / ax; }
+    else if (ay >= az) { f = y > 0 ? 2 : 3; u = x / ay; v = z / ay; }
+    else { f = z > 0 ? 4 : 5; u = x / az; v = y / az; }
+    const i = Math.min(GB - 1, Math.floor((u + 1) / 2 * GB)), j = Math.min(GB - 1, Math.floor((v + 1) / 2 * GB));
+    return (f * GB + j) * GB + i;
+  };
+  for (let t = 0; t < idx.length; t += 3) for (let k = 0; k < 3; k++) {
+    const v = idx[t + k] * 3, c = cellOf(pos[v], pos[v + 1], pos[v + 2]);
+    const list = cells[c] || (cells[c] = []);
+    if (list[list.length - 1] !== t) list.push(t);
+  }
+  const rayTri = (t, dx, dy, dz) => { // Möller–Trumbore, ray from the planet centre
+    const a = idx[t] * 3, b = idx[t + 1] * 3, c = idx[t + 2] * 3;
+    const ax = pos[a], ay = pos[a + 1], az = pos[a + 2];
+    const e1x = pos[b] - ax, e1y = pos[b + 1] - ay, e1z = pos[b + 2] - az;
+    const e2x = pos[c] - ax, e2y = pos[c + 1] - ay, e2z = pos[c + 2] - az;
+    const px = dy * e2z - dz * e2y, py = dz * e2x - dx * e2z, pz = dx * e2y - dy * e2x;
+    const det = e1x * px + e1y * py + e1z * pz;
+    if (Math.abs(det) < 1e-12) return -1;
+    const inv = 1 / det, sx = -ax, sy = -ay, sz = -az;
+    const u = (sx * px + sy * py + sz * pz) * inv;
+    if (u < -1e-6 || u > 1 + 1e-6) return -1;
+    const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+    const v = (dx * qx + dy * qy + dz * qz) * inv;
+    if (v < -1e-6 || u + v > 1 + 1e-6) return -1;
+    return (e2x * qx + e2y * qy + e2z * qz) * inv;
+  };
+  const hitCell = (c, d) => { const list = cells[c]; if (list) for (const t of list) { const r = rayTri(t, d.x, d.y, d.z); if (r > 0) return r; } return -1; };
+  groundR = d => {
+    const c = cellOf(d.x, d.y, d.z);
+    let r = hitCell(c, d);
+    if (r > 0) return r;
+    const i = c % GB, j = Math.floor(c / GB) % GB, f = Math.floor(c / (GB * GB));
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      const ii = i + di, jj = j + dj;
+      if ((di || dj) && ii >= 0 && jj >= 0 && ii < GB && jj < GB && (r = hitCell((f * GB + jj) * GB + ii, d)) > 0) return r;
+    }
+    return seabedR(terrainH(d));
+  };
+}
+
+
+// translucent sea surface; its per-vertex depth drives the banded colours, foam and see-through-ness
+const oceanInks = []; // the sea's outline pieces (hidden when the camera is underwater)
+{
+  let og = new THREE.IcosahedronGeometry(R, 64);
+  og.deleteAttribute('uv');
+  og = mergeVertices(og);
+  const pos = og.attributes.position, hA = new Float32Array(pos.count), v = new V3();
+  const iA = new Float32Array(pos.count);
+  for (let i = 0; i < pos.count; i++) { hA[i] = terrainH(v.fromBufferAttribute(pos, i).normalize()); iA[i] = iceField(v); }
+  og.computeVertexNormals();
+  og.setAttribute('aH', new THREE.BufferAttribute(hA, 1));
+  og.setAttribute('aIce', new THREE.BufferAttribute(iA, 1));
+  og.setAttribute('aOutlineNormal', og.attributes.normal);
+  const c = x => new THREE.Color(x);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uLight: U.uLight, uTime: U.uTime, uDot: U.uDot, uDeep: { value: c('#1d55c9') }, uMid: { value: c('#2c8cf0') }, uShallow: { value: c('#4fd3f7') }, uFoam: { value: c('#e9fbff') } },
+    vertexShader: `attribute float aH; attribute float aIce; varying float vH; varying float vIce; varying vec3 vN; varying vec3 vWP;
+      void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vWP = wp.xyz; vN = normalize(mat3(modelMatrix) * normal); vH = aH; vIce = aIce; gl_Position = projectionMatrix * viewMatrix * wp; }`,
+    fragmentShader: `uniform vec3 uLight; uniform float uTime; uniform float uDot; uniform vec3 uDeep; uniform vec3 uMid; uniform vec3 uShallow; uniform vec3 uFoam;
+      varying float vH; varying float vIce; varying vec3 vN; varying vec3 vWP;
+      float halftone(float k) { vec2 p = gl_FragCoord.xy / uDot; p = vec2(p.x + p.y, p.x - p.y) * 0.7071; return 1.0 - step(k, length(fract(p) - 0.5)); }
+      void main() {
+        vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N;
+        vec3 base; float a;
+        if (vH < -0.9) { base = uDeep; a = 0.88; }
+        else if (vH < -0.4) { base = uMid; a = 0.76; }
+        else if (vH < -0.07) { base = uShallow; a = 0.58; }
+        else { base = uFoam; a = 0.92; }
+        float w = sin(vWP.x * 5.0 + uTime * 1.3) * sin(vWP.y * 5.0 - uTime) * sin(vWP.z * 5.0 + uTime * 0.8);
+        if (w > 0.3) { base = mix(base, vec3(1.0), 0.25); a = min(1.0, a + 0.1); }
+        if (vIce > 0.0) { base = vIce > 1.0 ? vec3(0.92, 0.97, 1.0) : vec3(0.7, 0.88, 0.98); a = 1.0; } // sea ice
+        float d = dot(N, uLight);
+        vec3 col;
+        if (d > 0.22) col = base;
+        else if (d > -0.12) col = base * 0.78 * (1.0 - 0.2 * halftone(0.3));
+        else col = base * vec3(0.30, 0.34, 0.60) * (1.0 - 0.3 * halftone(0.36));
+        vec3 V = normalize(cameraPosition - vWP);
+        if (gl_FrontFacing && dot(N, normalize(uLight + V)) > 0.996) { col = vec3(1.0); a = 1.0; }
+        if (!gl_FrontFacing) a *= 0.75; // looking up at the surface from below
+        gl_FragColor = vec4(col, a);
+        #include <colorspace_fragment>
+      }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+  });
+  for (const piece of splitIntoPieces(og)) {
+    const ocean = new THREE.Mesh(piece.geo, mat);
+    ocean.renderOrder = 1;
+    outline(ocean, 3.2, 1e4);
+    oceanInks.push(ocean.children[0]);
+    world.add(ocean);
+    horizonMeshes.push({ mesh: ocean, dir: piece.dir, spread: piece.spread });
+  }
+}
+
+// atmosphere halo (posterised rings, comic style)
+const atmoMat = new THREE.ShaderMaterial({
+  uniforms: { uFade: { value: 1 } },
+  vertexShader: `varying vec3 vN; varying vec3 vW; void main(){ vN = normalize(mat3(modelMatrix)*normal); vec4 w = modelMatrix*vec4(position,1.); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`,
+  fragmentShader: `uniform float uFade; varying vec3 vN; varying vec3 vW;
+    void main(){ vec3 V = normalize(cameraPosition - vW); float f = pow(abs(dot(normalize(vN), V)), 3.0);
+      float a = f > 0.55 ? 0.30 : (f > 0.3 ? 0.16 : (f > 0.14 ? 0.07 : 0.0));
+      gl_FragColor = vec4(vec3(0.45, 0.9, 1.0), a * uFade); }`,
+  side: THREE.BackSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+});
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(13.6, 64, 32), atmoMat));
+
+// stars
+{
+  const n = 1400, a = new Float32Array(n * 3), v = new V3();
+  for (let i = 0; i < n; i++) { randDir(v).multiplyScalar(rr(300, 360)); a.set([v.x, v.y, v.z], i * 3); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(a, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xfff6d0, size: 2, sizeAttenuation: false })));
+}
+
+// sun
+const sun = new THREE.Group();
+{
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(6, 32, 16), new THREE.MeshBasicMaterial({ color: '#ffe45c' }));
+  outline(ball, 4, 1e4);
+  const star = (r1, r2, n) => { const s = new THREE.Shape(); for (let i = 0; i <= n * 2; i++) { const a = i / (n * 2) * TAU, r = i % 2 ? r2 : r1; i ? s.lineTo(Math.cos(a) * r, Math.sin(a) * r) : s.moveTo(r, 0); } return new THREE.ShapeGeometry(s); };
+  const rays = new THREE.Mesh(star(11, 7.2, 14), new THREE.MeshBasicMaterial({ color: '#ff9f1c' }));
+  rays.position.z = -3;
+  const raysInk = new THREE.Mesh(star(11.8, 7.8, 14), new THREE.MeshBasicMaterial({ color: '#140d33' }));
+  raysInk.position.z = -3.5;
+  sun.add(ball, rays, raysInk);
+  sun.userData.rays = [rays, raysInk];
+  scene.add(sun);
+}
+
+// moon: cratered, tidally locked, with a little flag facing the planet
+const moon = new THREE.Group();
+const moonCraters = [];
+for (let i = 0; i < 26; i++) moonCraters.push({ c: randDir(), r: i < 5 ? rr(0.3, 0.5) : rr(0.08, 0.25) });
+function moonRad(v) {
+  let h = noise(v.x * 3, v.y * 3, v.z * 3) * 0.03;
+  for (const k of moonCraters) {
+    const t = angle(v, k.c) / k.r;
+    if (t < 1) h -= 0.28 * k.r * (1 - t * t);
+    else if (t < 1.35) h += 0.08 * k.r * (1 - (t - 1) / 0.35);
+  }
+  return 2.2 * (1 + h);
+}
+const MOON_SITE_DIR = new V3(-0.55, 0.15, 0.82).normalize(); // rocket landing site, on the planet-facing side
+{
+  let mg = new THREE.IcosahedronGeometry(2.2, 24);
+  mg.deleteAttribute('normal'); mg.deleteAttribute('uv');
+  mg = mergeVertices(mg);
+  const pos = mg.attributes.position, cols = [], v = new V3(), light = new THREE.Color('#ebe7f7'), dark = new THREE.Color('#aaa3cc'), rim = new THREE.Color('#f7f5ff');
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i).normalize();
+    let col = light;
+    for (const k of moonCraters) {
+      const t = angle(v, k.c) / k.r;
+      if (t < 1) col = dark; else if (t < 1.35 && col === light) col = rim;
+    }
+    v.multiplyScalar(moonRad(v)); pos.setXYZ(i, v.x, v.y, v.z);
+    cols.push(col.r, col.g, col.b);
+  }
+  mg.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  mg.computeVertexNormals();
+  mg.setAttribute('aOutlineNormal', mg.attributes.normal);
+  moon.add(outline(new THREE.Mesh(mg, comicMat('#fff', { vertexColors: true })), 3, 1e4));
+  const pole = outline(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.7, 6).translate(0, 0.35, 0), comicMat('#ffffff')), 1.5, 30);
+  const flag = outline(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.25, 0.02).translate(0.2, 0.55, 0), comicMat('#ff5d73')), 1.5, 30);
+  const mount = new THREE.Group(); mount.add(pole, flag);
+  mount.quaternion.setFromUnitVectors(Y, new V3(0.25, 0.35, 1).normalize());
+  mount.position.set(0.25, 0.35, 1).normalize().multiplyScalar(2.17);
+  moon.add(mount);
+  scene.add(moon);
+}
+const MOON_W = TAU / 160;
+const moonAt = (a, out = new V3()) => out.set(Math.cos(a) * 34, Math.sin(a) * 9, Math.sin(a) * 32);
+// start the moon where the first launch window opens a few seconds after load
+let moonAngle = 0;
+{
+  let best = -2;
+  for (let i = 0; i < 720; i++) {
+    const a = i / 720 * TAU, d = moonAt(a + MOON_W * 36).normalize().dot(PAD.dir);
+    if (d > best) { best = d; moonAngle = a; }
+  }
+}
+
+// ---------- roads ----------
+class Road {
+  constructor(dirs, closed, lift) {
+    this.closed = closed;
+    this.pts = dirs.map(d => d.clone().multiplyScalar(surfaceR(d) + lift));
+    if (closed) this.pts.push(this.pts[0].clone());
+    this.cum = [0];
+    for (let i = 1; i < this.pts.length; i++) this.cum.push(this.cum[i - 1] + this.pts[i].distanceTo(this.pts[i - 1]));
+    this.len = this.cum[this.cum.length - 1];
+  }
+  sample(s, pos, tan) {
+    let lo = 0, hi = this.cum.length - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (this.cum[mid] <= s) lo = mid; else hi = mid; }
+    const t = (s - this.cum[lo]) / ((this.cum[hi] - this.cum[lo]) || 1);
+    pos.lerpVectors(this.pts[lo], this.pts[hi], t);
+    tan.subVectors(this.pts[hi], this.pts[lo]).normalize();
+  }
+}
+function ribbon(pts, hw, lift, keep) {
+  const pos = [], nor = [], idx = [], n = pts.length, t = new V3(), up = new V3(), side = new V3(), p = new V3();
+  for (let i = 0; i < n; i++) {
+    t.subVectors(pts[Math.min(i + 1, n - 1)], pts[Math.max(i - 1, 0)]);
+    up.copy(pts[i]).normalize();
+    side.crossVectors(t, up).normalize().multiplyScalar(hw);
+    p.copy(pts[i]).addScaledVector(up, lift);
+    pos.push(p.x + side.x, p.y + side.y, p.z + side.z, p.x - side.x, p.y - side.y, p.z - side.z);
+    nor.push(up.x, up.y, up.z, up.x, up.y, up.z);
+  }
+  for (let i = 0; i < n - 1; i++) if (!keep || keep(i)) { const a = 2 * i; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setIndex(idx);
+  return g;
+}
+const roads = [];
+{
+  for (const c of cities) {
+    const n = Math.ceil(TAU * Math.sin(c.r * 0.95) * R / 0.07), dirs = [];
+    for (let i = 0; i < n; i++) dirs.push(offsetDir(c.dir, c.r * 0.95, i / n * TAU));
+    roads.push(new Road(dirs, true, 0.010));
+  }
+  for (const hw of highways) {
+    const n = Math.ceil(hw.ang * R / 0.07), dirs = [];
+    for (let i = 0; i <= n; i++) dirs.push(hw.a.clone().applyAxisAngle(hw.n, hw.ang * i / n));
+    roads.push(new Road(dirs, false, 0.012));
+    roads[roads.length - 1].ends = [hw.ia, hw.ib]; // city index at s = 0 and at s = len
+  }
+  const asphalt = comicMat('#3b3552', { offset: 1 }), paint = comicMat('#ffd84d', { offset: 2 });
+  const rg = [], dg = [];
+  for (const r of roads) { rg.push(ribbon(r.pts, 0.055, 0, null)); dg.push(ribbon(r.pts, 0.006, 0.002, i => i % 3 === 0)); }
+  world.add(new THREE.Mesh(mergeGeometries(rg), asphalt), new THREE.Mesh(mergeGeometries(dg), paint));
+}
+
+roads.forEach((r, i) => r.rank = (r.closed ? 1000 : 0) + i);
+
+// ---------- city: skyscrapers + rooftops ----------
+const obstacles = []; // building/house footprints {d: unit dir, half: angular radius}
+const lots = [];      // parking lots beside each city's ring road
+const vivid = ['#ff5d73', '#ffc93c', '#4cc9f0', '#b388ff', '#ff9f1c', '#f7f3e3', '#72efdd', '#ff87ab', '#7aa2ff', '#c3f73a'];
+{
+  const bGeo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+  const buildings = makeInstanced(bGeo, comicMat('#fff', { windows: true }), 500, 2, 3);
+  const roofs = makeInstanced(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), comicMat('#fff'), 500, 1.5, 3);
+  const spires = makeInstanced(new THREE.ConeGeometry(0.5, 1, 6).translate(0, 0.5, 0), comicMat('#fff'), 60, 1.5, 3);
+  let nb = 0, ns = 0; const placed = obstacles;
+  for (const c of cities) {
+    let count = 0;
+    for (let t = 0; t < 900 && count < 64; t++) {
+      const a = Math.sqrt(rand()) * c.r * 0.86, phi = rand() * TAU, d = offsetDir(c.dir, a, phi);
+      const w = rr(0.1, 0.2), dp = rr(0.1, 0.2), half = Math.max(w, dp) * 0.72 / R;
+      if (nearRoad(d, 0.007 + half)) continue;
+      if (placed.some(q => angle(q.d, d) < q.half + half)) continue;
+      const rec = { d, half };
+      placed.push(rec);
+      const k = 1 - a / (c.r * 0.86), hgt = 0.12 + Math.pow(k, 1.5) * rr(0.35, 1.25) + rr(0, 0.12);
+      const r = surfaceR(d) - 0.03, roofH = rr(0.03, 0.08);
+      const mB = surfaceMatrix(d, r, phi, w, hgt + 0.03, dp), mR = surfaceMatrix(d, r + hgt + 0.03, phi, w * rr(0.4, 0.7), roofH, dp * rr(0.4, 0.7));
+      buildings.setMatrixAt(nb, mB);
+      buildings.setColorAt(nb, _col.set(pick(vivid)));
+      roofs.setMatrixAt(nb, mR);
+      roofs.setColorAt(nb, _col.set(pick(['#5c5470', '#8d86a8', '#ff5d73', '#ffffff'])));
+      Object.assign(rec, { base: d.clone().multiplyScalar(r), height: hgt, top: r + hgt + 0.03 + roofH,
+        parts: [{ mesh: buildings, idx: nb, m0: mB }, { mesh: roofs, idx: nb, m0: mR }] });
+      if (hgt > 0.8 && ns < 60) {
+        const mS = surfaceMatrix(d, r + hgt + 0.03, 0, 0.05, rr(0.2, 0.35), 0.05);
+        spires.setMatrixAt(ns, mS);
+        rec.parts.push({ mesh: spires, idx: ns, m0: mS });
+        spires.setColorAt(ns++, _col.set(pick(['#ffffff', '#ffc93c', '#ff5d73'])));
+      }
+      nb++; count++;
+    }
+  }
+  finalize(buildings, nb); finalize(roofs, nb); finalize(spires, ns);
+
+  // parking lots: asphalt beside the ring road, two rows of bays either side of an aisle
+  {
+    const BAY_W = 0.06, BAYS = 7, L = BAY_W * BAYS, HALF_W = 0.15, AISLE = 0.05;
+    const asphaltG = [], paintG = [];
+    const lotPoint = (l, u, v, lift, out = new V3()) => {
+      out.copy(l.c).addScaledVector(l.e1, u / R).addScaledVector(l.e2, v / R).normalize();
+      return out.multiplyScalar(radiusOf(terrainH(out)) + lift);
+    };
+    // a draped grid patch over the terrain between u0..u1 and v0..v1 (lot-local units)
+    const patch = (l, u0, u1, v0, v1, nu, nv, lift) => {
+      const pos = [], nor = [], idx = [], p = new V3(), n = new V3();
+      for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
+        lotPoint(l, lerp(u0, u1, i / nu), lerp(v0, v1, j / nv), lift, p);
+        n.copy(p).normalize();
+        pos.push(p.x, p.y, p.z); nor.push(n.x, n.y, n.z);
+      }
+      const flip = l.flip;
+      for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+        const a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1;
+        flip ? idx.push(a, c, b, b, c, d) : idx.push(a, b, c, b, d, c);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+      g.setIndex(idx);
+      return g;
+    };
+    const signTex = (() => {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+      const x = cv.getContext('2d');
+      x.fillStyle = '#2f6fe0'; x.fillRect(0, 0, 64, 64);
+      x.strokeStyle = '#fff'; x.lineWidth = 5; x.strokeRect(6, 6, 52, 52);
+      x.fillStyle = '#fff'; x.font = 'bold 44px Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('P', 32, 35);
+      const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+    })();
+    const poleMat = comicMat('#d9d2e6'), signBack = comicMat('#2f6fe0'), signFace = new THREE.MeshBasicMaterial({ map: signTex });
+    for (const c of cities) {
+      let made = 0;
+      for (let t = 0; t < 40 && made < 2; t++) {
+        const ang = c.r * 0.95 + 0.235 / R, phi = rand() * TAU;
+        const cdir = offsetDir(c.dir, ang, phi);
+        const e1 = offsetDir(c.dir, ang, phi + 0.001).sub(cdir).normalize();
+        const e2 = offsetDir(c.dir, ang + 0.001, phi).sub(cdir).normalize();
+        const l = { c: cdir, e1, e2, flip: new V3().crossVectors(e1, e2).dot(cdir) < 0 };
+        // keep clear of highways, other lots and buildings
+        let ok = !lots.some(o => angle(o.c, cdir) < 0.06);
+        for (let i = 0; i <= 4 && ok; i++) for (let j = 0; j <= 2 && ok; j++) {
+          const q = lotPoint(l, lerp(-L / 2, L / 2, i / 4), lerp(-HALF_W, HALF_W, j / 2), 0).normalize();
+          if (highways.some(hw => arcDist(hw, q) < 0.012) || obstacles.some(o => angle(o.d, q) < o.half + 0.003) || terrainH(q) < 0.05 || Math.abs(q.y) < 0.02) ok = false;
+        }
+        if (!ok) continue;
+        made++; lots.push(l);
+        // how cars get in and out: ring road -> gate at the end of the aisle -> along the aisle -> bay
+        const ring = roads[cities.indexOf(c)], uGate = -L / 2 - 0.07, phiG = phi + uGate / (R * Math.sin(ang));
+        const surf = d => d.multiplyScalar(radiusOf(terrainH(d)) + 0.008);
+        Object.assign(l, {
+          ring, ringS: (((phiG % TAU) + TAU) % TAU) / TAU * ring.len,
+          ringIn: surf(offsetDir(c.dir, c.r * 0.95, phiG)), ringOut: surf(offsetDir(c.dir, c.r * 0.95 + 0.1 / R, phiG)),
+          gate: lotPoint(l, uGate, 0, 0.008), aisle: u => lotPoint(l, u, 0, 0.008),
+        });
+        (ring.lots ||= []).push(l);
+        l.radius = Math.hypot(L / 2, HALF_W) / R;
+        asphaltG.push(patch(l, -L / 2, L / 2, -HALF_W, HALF_W, 10, 6, 0.006));
+        for (let i = 0; i <= BAYS; i++) {
+          const u = -L / 2 + i * BAY_W;
+          paintG.push(patch(l, u - 0.0025, u + 0.0025, AISLE, HALF_W - 0.01, 1, 3, 0.009));
+          paintG.push(patch(l, u - 0.0025, u + 0.0025, -(HALF_W - 0.01), -AISLE, 1, 3, 0.009));
+        }
+        for (const side of [-1, 1]) paintG.push(patch(l, -L / 2, L / 2, side * (HALF_W - 0.0125), side * (HALF_W - 0.0075), 10, 1, 0.009));
+        // bays: nose-in, facing away from the aisle
+        l.bays = [];
+        for (let i = 0; i < BAYS; i++) for (const side of [-1, 1]) {
+          const u = -L / 2 + (i + 0.5) * BAY_W, v = side * (AISLE + HALF_W - 0.01) / 2;
+          const pos = lotPoint(l, u, v, 0.006), up = pos.clone().normalize();
+          const fwd = lotPoint(l, u, v + side * 0.01, 0.006).sub(pos).normalize();
+          l.bays.push({ pos, up, fwd, u, occupied: null });
+        }
+        // P sign on a pole at the end of the aisle
+        const sp = lotPoint(l, -L / 2 - 0.03, 0, 0), up = sp.clone().normalize();
+        const face = lotPoint(l, -L / 2 - 0.04, 0, 0).sub(sp).normalize();
+        const sign = new THREE.Group();
+        frameMatrix(sp, up, face).decompose(sign.position, sign.quaternion, sign.scale);
+        sign.add(outline(new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.11, 6).translate(0, 0.055, 0), poleMat), 1, 3));
+        sign.add(outline(new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.045, 0.006).translate(0, 0.12, 0), signBack), 1.5, 3));
+        const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.04, 0.04), signFace); plate.position.set(0, 0.12, 0.0035);
+        sign.add(plate);
+        world.add(sign);
+      }
+    }
+    if (asphaltG.length) {
+      world.add(new THREE.Mesh(mergeGeometries(asphaltG), comicMat('#4a4560', { offset: 1 })));
+      world.add(new THREE.Mesh(mergeGeometries(paintG), comicMat('#ffffff', { offset: 2 })));
+    }
+  }
+
+  // suburbs: little houses with pointy roofs
+  const houses = makeInstanced(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), comicMat('#fff'), 400, 1.5, 3);
+  const hroofs = makeInstanced(new THREE.ConeGeometry(0.74, 1, 4).rotateY(Math.PI / 4).translate(0, 0.5, 0), comicMat('#fff'), 400, 1.5, 3);
+  let nh = 0;
+  for (const c of cities) {
+    let count = 0;
+    for (let t = 0; t < 900 && count < 55; t++) {
+      const a = rr(c.r * 1.07, c.r + 0.14), phi = rand() * TAU, d = offsetDir(c.dir, a, phi);
+      if (terrainH(d) < 0.07 || nearRoad(d, 0.012)) continue;
+      const half = 0.009;
+      if (placed.some(q => angle(q.d, d) < q.half + half)) continue;
+      if (lots.some(l => angle(l.c, d) < l.radius + half)) continue;
+      const w = rr(0.07, 0.1), dp = rr(0.08, 0.12), hh = rr(0.05, 0.08), r = surfaceR(d) - 0.02, roofH = rr(0.04, 0.07);
+      const mH = surfaceMatrix(d, r, phi, w, hh + 0.02, dp), mR = surfaceMatrix(d, r + hh + 0.02, phi, w, roofH, dp);
+      placed.push({ d, half, base: d.clone().multiplyScalar(r), height: hh, top: r + hh + 0.02 + roofH,
+        parts: [{ mesh: houses, idx: nh, m0: mH }, { mesh: hroofs, idx: nh, m0: mR }] });
+      houses.setMatrixAt(nh, mH);
+      houses.setColorAt(nh, _col.set(pick(['#fff3d6', '#ffd6e0', '#d6f4ff', '#fffbe6', '#e6ffd6'])));
+      hroofs.setMatrixAt(nh, mR);
+      hroofs.setColorAt(nh, _col.set(pick(['#e63946', '#ff7b00', '#3a86ff', '#8338ec'])));
+      nh++; count++;
+    }
+  }
+  finalize(houses, nh); finalize(hroofs, nh);
+
+  // trees
+  const trunks = makeInstanced(new THREE.CylinderGeometry(0.1, 0.14, 1, 6).translate(0, 0.5, 0), comicMat('#8a5a3b'), 2200); // tiny: no outline needed
+  const pines = makeInstanced(new THREE.ConeGeometry(0.5, 1, 7).translate(0, 0.5, 0), comicMat('#fff'), 2200, 1.5, 3);
+  const blobs = makeInstanced(new THREE.IcosahedronGeometry(0.5, 1), comicMat('#fff'), 2200, 1.5, 3);
+  let nt = 0, np = 0, nr = 0; const d = new V3();
+  for (let t = 0; t < 14000 && nt < 2200; t++) {
+    randDir(d);
+    const h = terrainH(d);
+    if (h < 0.1 || h > 1.9) continue;
+    if (noise(d.x * 4 + 11, d.y * 4, d.z * 4) < 0 && rand() < 0.85) continue;
+    if (cities.some(c => angle(d, c.dir) < c.r + 0.12) || nearRoad(d, 0.012)) continue;
+    const s = rr(0.7, 1.35), r = radiusOf(h) - 0.02, yaw = rand() * TAU;
+    trunks.setMatrixAt(nt++, surfaceMatrix(d, r, yaw, 0.12 * s, 0.07 * s, 0.12 * s));
+    const g = _col.setHSL(rr(0.26, 0.38), rr(0.55, 0.8), rr(0.3, 0.48));
+    if (h > 0.9 || rand() < 0.4) { pines.setMatrixAt(np, surfaceMatrix(d, r + 0.04 * s, yaw, 0.13 * s, 0.22 * s, 0.13 * s)); pines.setColorAt(np++, g); }
+    else { blobs.setMatrixAt(nr, surfaceMatrix(d, r + 0.1 * s, yaw, 0.16 * s, 0.14 * s, 0.16 * s)); blobs.setColorAt(nr++, g); }
+  }
+  finalize(trunks, nt); finalize(pines, np); finalize(blobs, nr);
+  cullableInstances.push(trunks, pines, blobs);
+}
+
+// ---------- windmills ----------
+const windmills = [];
+{
+  const white = comicMat('#ffffff'), red = comicMat('#ff5d73');
+  const towerG = new THREE.CylinderGeometry(0.008, 0.015, 0.24, 8).translate(0, 0.12, 0);
+  const nacG = new THREE.BoxGeometry(0.022, 0.022, 0.045);
+  const bladeG = new THREE.BoxGeometry(0.012, 0.11, 0.003).translate(0, 0.055, 0);
+  const d = new V3();
+  for (let t = 0; t < 4000 && windmills.length < 12; t++) {
+    randDir(d); const h = terrainH(d);
+    if (h < 0.3 || h > 0.9 || cities.some(c => angle(d, c.dir) < c.r + 0.15) || nearRoad(d, 0.02)) continue;
+    const g = new THREE.Group();
+    g.applyMatrix4(surfaceMatrix(d.clone(), radiusOf(h) - 0.02, rand() * TAU, 1, 1, 1));
+    const tower = outline(new THREE.Mesh(towerG, white), 1.5, 3);
+    const nac = outline(new THREE.Mesh(nacG, white), 1.5, 3); nac.position.y = 0.24;
+    const hub = new THREE.Group(); hub.position.set(0, 0.24, 0.027);
+    for (let i = 0; i < 3; i++) { const b = outline(new THREE.Mesh(bladeG, i ? white : red), 1.5, 3); b.rotation.z = i * TAU / 3; hub.add(b); }
+    g.add(tower, nac, hub); world.add(g);
+    windmills.push({ hub, speed: rr(1.5, 3) });
+  }
+}
+
+// ---------- cars ----------
+const cars = [];
+const carBody = makeInstanced(new THREE.BoxGeometry(0.036, 0.018, 0.078).translate(0, 0.017, 0), comicMat('#fff'), 280, 1.5, 3);
+const carCab = makeInstanced(new THREE.BoxGeometry(0.03, 0.016, 0.04).translate(0, 0.034, -0.006), comicMat('#cdefff'), 280, 1.5, 3);
+const carWheels = makeInstanced(mergeGeometries([[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) =>
+  new THREE.CylinderGeometry(0.009, 0.009, 0.008, 10).rotateZ(Math.PI / 2).translate(x * 0.018, 0.009, z * 0.024))), comicMat('#221c33'), 280);
+const carLights = makeInstanced(mergeGeometries([-1, 1].map(x => new THREE.BoxGeometry(0.008, 0.006, 0.004).translate(x * 0.011, 0.02, 0.04))),
+  new THREE.MeshBasicMaterial({ color: '#fff3a0' }), 280);
+for (const road of roads) {
+  const n = road.closed ? 7 : Math.max(3, Math.round(road.len / 1.6));
+  for (let i = 0; i < n; i++) {
+    const c = { idx: cars.length, road, s: rand() * road.len, dir: rand() < 0.5 ? 1 : -1, speed: rr(0.3, 0.55), cur: 0, wait: 0, blocker: null, pos: new V3(), fwd: new V3(0, 0, 1), up: new V3(0, 1, 0) };
+    carBody.setColorAt(cars.length, _col.set(pick(vivid)));
+    cars.push(c);
+  }
+}
+for (const l of lots) for (const b of l.bays) {
+  if (rand() > 0.6) continue; // leave some bays free
+  carBody.setColorAt(cars.length, _col.set(pick(vivid)));
+  const car = { idx: cars.length, parked: true, lot: l, bay: b, leaveAt: rr(5, 60), speed: rr(0.3, 0.55), cur: 0, wait: 0, blocker: null, pos: b.pos.clone(), fwd: b.fwd.clone(), up: b.up.clone() };
+  b.occupied = car;
+  cars.push(car);
+}
+[carBody, carCab, carWheels, carLights].forEach(m => finalize(m, cars.length));
+const _p = new V3(), _t = new V3(), _r = new V3(), _np = new V3(), _nf = new V3(), _nu = new V3(), _dd = new V3();
+function roadPose(c, s, dir, pos, fwd, up, road = c.road) {
+  road.sample(s, _p, _t);
+  up.copy(_p).normalize();
+  fwd.copy(_t).multiplyScalar(dir).addScaledVector(up, -_t.dot(up) * dir).normalize();
+  _r.crossVectors(fwd, up).normalize();
+  pos.copy(_p).addScaledVector(_r, -0.026); // drive on the left
+}
+// each car is two circles (front and back); cars may never overlap more than they already do
+const CAR_R = 0.019, CAR_OFF = 0.02;
+function carGap(apos, afwd, b) {
+  let m = Infinity;
+  for (let sa = -1; sa <= 1; sa += 2) for (let sb = -1; sb <= 1; sb += 2) {
+    const dx = apos.x + afwd.x * CAR_OFF * sa - b.pos.x - b.fwd.x * CAR_OFF * sb;
+    const dy = apos.y + afwd.y * CAR_OFF * sa - b.pos.y - b.fwd.y * CAR_OFF * sb;
+    const dz = apos.z + afwd.z * CAR_OFF * sa - b.pos.z - b.fwd.z * CAR_OFF * sb;
+    m = Math.min(m, dx * dx + dy * dy + dz * dz);
+  }
+  return Math.sqrt(m);
+}
+function carBlocked(c, pos, fwd) {
+  for (const o of cars) {
+    if (o === c || o.pos.distanceToSquared(pos) > 0.012) continue;
+    const g = carGap(pos, fwd, o);
+    if (g < CAR_R * 2 && g < carGap(c.pos, c.fwd, o) - 1e-6) return true;
+  }
+  return false;
+}
+// ----- parking: scripted paths into and out of the bays -----
+function makePath(points) {
+  const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal');
+  const n = Math.max(6, Math.ceil(curve.getLength() / 0.015));
+  const pts = curve.getSpacedPoints(n).map(p => { const d = p.clone().normalize(); return d.multiplyScalar(radiusOf(terrainH(d)) + 0.008); });
+  const P = { pts, cum: [0], closed: false };
+  for (let i = 1; i < pts.length; i++) P.cum.push(P.cum[i - 1] + pts[i].distanceTo(pts[i - 1]));
+  P.len = P.cum[P.cum.length - 1];
+  return P;
+}
+function setPath(c, points, rev, after) { c.path = makePath(points); c.ps = 0; c.rev = rev; c.after = after; c.pathWait = 0; }
+function freeBay(l) {
+  const free = l.bays.filter(b => !b.occupied && !cars.some(o => o.pos.distanceToSquared(b.pos) < 0.0025));
+  return free.length ? pick(free) : null;
+}
+function maybePark(c) {
+  const r = c.road;
+  if (!r.lots || time < (c.noParkUntil || 0)) return;
+  for (const l of r.lots) {
+    let d = Math.abs(c.s - l.ringS); d = Math.min(d, r.len - d);
+    if (d > 0.04) continue;
+    c.noParkUntil = time + 4;
+    if (rand() > 0.35) return;          // most cars just drive past
+    const bay = freeBay(l); if (!bay) return;
+    bay.occupied = c; c.lot = l; c.bay = bay;
+    setPath(c, [c.pos.clone(), l.ringOut, l.gate, l.aisle(bay.u), bay.pos], false, 'park');
+    return;
+  }
+}
+function startLeaving(c) {
+  const b = c.bay, l = c.lot;
+  c.parked = false;
+  setPath(c, [b.pos.clone(), l.aisle(b.u).lerp(b.pos, 0.5), l.aisle(b.u)], true, 'backout'); // reverse out of the bay
+}
+function followPath(c, dt) {
+  const P = c.path, ns = Math.min(P.len, c.ps + (c.rev ? 0.1 : 0.16) * dt);
+  Road.prototype.sample.call(P, ns, _np, _nf);
+  _nu.copy(_np).normalize();
+  _nf.addScaledVector(_nu, -_nf.dot(_nu)).normalize();
+  if (c.rev) _nf.negate();
+  if (time < (c.ghostUntil || 0) || !carBlocked(c, _np, _nf)) { c.ps = ns; c.pos.copy(_np); c.fwd.copy(_nf); c.up.copy(_nu); c.pathWait = 0; }
+  else if ((c.pathWait += dt) > 6) { c.ghostUntil = time + 1.5; c.pathWait = 0; } // squeeze past rather than jam forever
+  if (c.ps >= P.len - 1e-4) pathDone(c);
+}
+function pathDone(c) {
+  const l = c.lot, b = c.bay;
+  if (c.after === 'park') {
+    c.path = null; c.parked = true; c.leaveAt = time + rr(10, 45);
+    c.pos.copy(b.pos); c.fwd.copy(b.fwd); c.up.copy(b.up);
+  } else if (c.after === 'backout') {
+    setPath(c, [c.pos.clone(), l.aisle(b.u - 0.07), l.gate, l.ringOut, l.ringIn], false, 'join');
+  } else if (c.after === 'join') { // merge back onto the ring road when there's a gap
+    const dir = rand() < 0.5 ? 1 : -1;
+    c.road = l.ring;
+    roadPose(c, l.ringS, dir, _np, _nf, _nu);
+    if (!carBlocked(c, _np, _nf)) {
+      c.s = l.ringS; c.dir = dir; c.pos.copy(_np); c.fwd.copy(_nf); c.up.copy(_nu);
+      c.path = null; c.cur = 0; b.occupied = null; c.lot = c.bay = null; c.noParkUntil = time + 25;
+    }
+  }
+}
+function updateCars(dt) {
+  cars.forEach((c, i) => {
+    if (c.manual) driveSurface(c, dt, CAR_DRIVE);
+    else if (c.parked) { if (c.bay && time > c.leaveAt) startLeaving(c); }
+    else if (c.path) followPath(c, dt);
+    else {
+      // look for traffic ahead that we must wait for
+      _r.crossVectors(c.fwd, c.up);
+      let gap = Infinity, blocker = null;
+      const myRank = c.road.rank;
+      for (const o of cars) {
+        if (o === c) continue;
+        _dd.subVectors(o.pos, c.pos);
+        const ahead = _dd.dot(c.fwd);
+        if (ahead <= 0 || ahead > 0.2 || Math.abs(_dd.dot(_r)) > 0.034) continue;
+        const align = o.fwd.dot(c.fwd);
+        if (align < -0.5) continue; // oncoming traffic seen across a bend: not in our lane
+        if (align < 0.7) {
+          // crossing traffic: give way to busier roads, and to cars you can't get round (yours, parked, parking);
+          // otherwise only stop if it's already right in the junction in front of us
+          const theirRank = o.manual || o.parked || o.path ? Infinity : o.road.rank;
+          if (theirRank < myRank && ahead > 0.075) continue;
+        }
+        if (ahead < gap) { gap = ahead; blocker = o; }
+      }
+      // two cars waiting on each other: whoever has right of way goes
+      if (blocker && blocker.blocker === c && !blocker.manual && !blocker.parked && !blocker.path) {
+        const mine = myRank * 1000 + c.idx, theirs = blocker.road.rank * 1000 + blocker.idx;
+        if (mine > theirs) blocker = null;
+      }
+      if (c.ghost > 0) blocker = null; // squeezing past a jam
+      c.blocker = blocker;
+      let target = !blocker ? c.speed : gap < 0.1 ? 0 : c.speed * (gap - 0.1) / 0.1;
+      // people in the road ahead: slow down and stop for them (even when squeezing through a jam)
+      let pedGap = Infinity;
+      for (const p of people) {
+        if (p.gone != null || p.swim > 0.5) continue;
+        _dd.subVectors(p.pos, c.pos);
+        const ahead = _dd.dot(c.fwd);
+        if (ahead <= 0 || ahead > 0.16 || Math.abs(_dd.dot(_r)) > 0.035) continue;
+        pedGap = Math.min(pedGap, ahead);
+      }
+      if (pedGap < Infinity) target = Math.min(target, pedGap < 0.07 ? 0 : c.speed * Math.min(1, (pedGap - 0.07) / 0.09));
+      c.cur = target < c.cur ? Math.max(target, c.cur - 3 * dt) : Math.min(target, c.cur + 0.6 * dt);
+      c.wait = c.cur < 0.02 ? c.wait + dt : 0;
+      if (c.wait > 5 && ((blocker && (blocker.manual || blocker.parked)) || pedGap < 0.1)) { c.dir *= -1; c.wait = 0; } // someone parked (or standing) in the road: turn round
+      else if (c.wait > 5) { c.ghost = 1.5; c.wait = 0; } // last resort: nothing stays jammed forever
+      let r = c.road, s = c.s + c.dir * c.cur * dt, dir = c.dir;
+      if (r.closed) s = (s % r.len + r.len) % r.len;
+      else if (s < 0 || s > r.len) {
+        // reached a city centre: carry on along another highway from here (or turn back if it's a dead end)
+        const city = s < 0 ? r.ends[0] : r.ends[1];
+        const onward = roads.filter(q => q !== r && q.ends && q.ends.includes(city));
+        if (onward.length && rand() < 0.85) { r = pick(onward); const fromStart = r.ends[0] === city; s = fromStart ? 0 : r.len; dir = fromStart ? 1 : -1; }
+        else { s = clamp(s, 0, r.len); dir = -dir; }
+      }
+      roadPose(c, s, dir, _np, _nf, _nu, r);
+      // never drive into another car... unless we've been wedged for a while, then squeeze past briefly
+      if (c.ghost > 0 || !carBlocked(c, _np, _nf)) {
+        c.road = r; c.s = s; c.dir = dir; c.pos.copy(_np); c.fwd.copy(_nf); c.up.copy(_nu); c.wedged = 0;
+      } else {
+        c.cur = 0;
+        if ((c.wedged = (c.wedged || 0) + dt) > 2) { c.ghost = 1.2; c.wedged = 0; }
+      }
+      if (c.ghost > 0) c.ghost -= dt;
+      maybePark(c);
+    }
+    const m = frameMatrix(c.pos, c.up, c.fwd);
+    carBody.setMatrixAt(i, m); carCab.setMatrixAt(i, m); carWheels.setMatrixAt(i, m); carLights.setMatrixAt(i, m);
+  });
+  [carBody, carCab, carWheels, carLights].forEach(m => m.instanceMatrix.needsUpdate = true);
+}
+cars.forEach(c => { if (!c.parked) { roadPose(c, c.s, c.dir, c.pos, c.fwd, c.up); c.cur = c.speed; } });
+
+// ---------- boats ----------
+const boats = [];
+const boatHull = makeInstanced(mergeGeometries([
+  new THREE.BoxGeometry(0.07, 0.03, 0.14).translate(0, 0.006, 0),
+  new THREE.ConeGeometry(0.0495, 0.05, 4).rotateY(Math.PI / 4).scale(1, 1, 0.6).rotateX(Math.PI / 2).translate(0, 0.006, 0.085)]), comicMat('#fff'), 20, 1.5, 3);
+const boatCabin = makeInstanced(new THREE.BoxGeometry(0.048, 0.04, 0.055).translate(0, 0.04, -0.02), comicMat('#ffffff'), 20, 1.5, 3);
+const boatStack = makeInstanced(new THREE.CylinderGeometry(0.009, 0.009, 0.04, 8).translate(0, 0.07, -0.03), comicMat('#ffc93c'), 20, 1.5, 3);
+const wakeG = new THREE.BufferGeometry();
+wakeG.setAttribute('position', new THREE.Float32BufferAttribute([0, 0.002, -0.06, -0.07, 0.002, -0.34, -0.035, 0.002, -0.34, 0, 0.002, -0.06, 0.035, 0.002, -0.34, 0.07, 0.002, -0.34, 0, 0.002, 0.1, -0.045, 0.002, 0.02, 0.045, 0.002, 0.02], 3));
+const boatWake = makeInstanced(wakeG, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }), 20);
+boatWake.renderOrder = 2;
+{
+  const d = new V3();
+  for (let t = 0; t < 5000 && boats.length < 14; t++) {
+    randDir(d); const a = rr(0.1, 0.3);
+    let ok = true;
+    for (let i = 0; i < 24 && ok; i++) { const q = offsetDir(d, a, i / 24 * TAU); if (terrainH(q) > -0.15 || Math.abs(q.y) > 0.9) ok = false; }
+    if (!ok) continue;
+    const [t1, t2] = basisOf(d.clone());
+    boatHull.setColorAt(boats.length, _col.set(pick(['#ff5d73', '#3a86ff', '#ffc93c', '#8338ec', '#06d6a0'])));
+    boats.push({ kind: 'boat', c: d.clone(), a, t1, t2, phi: rand() * TAU, w: rr(0.3, 0.5) / (Math.sin(a) * R) * (rand() < 0.5 ? -1 : 1), pos: new V3(), fwd: new V3(), up: new V3() });
+  }
+  [boatHull, boatCabin, boatStack, boatWake].forEach(m => finalize(m, boats.length));
+}
+// boats and subs are solid: each hull is two spheres along its length. Subs sit lower, so a submerged
+// sub passes under a boat (and subs at different depths pass over/under each other), but a surfaced one bumps it.
+const VESSEL = { boat: { off: 0.055, r: 0.045, lift: 0.006 }, sub: { off: 0.1, r: 0.06, lift: 0 } };
+const _va = new V3(), _vb = new V3(), _vc = new V3(), _vu2 = new V3(), _vf2 = new V3(), _vp2 = new V3();
+function vesselGap(a, apos, afwd, b) { // clearance between the two hulls (negative = overlapping)
+  const A = VESSEL[a.kind], B = VESSEL[b.kind];
+  let m = Infinity;
+  for (let sa = -1; sa <= 1; sa += 2) for (let sb = -1; sb <= 1; sb += 2) {
+    _va.copy(apos).addScaledVector(afwd, A.off * sa); _va.addScaledVector(_vc.copy(apos).normalize(), A.lift);
+    _vb.copy(b.pos).addScaledVector(b.fwd, B.off * sb); _vb.addScaledVector(_vc.copy(b.pos).normalize(), B.lift);
+    m = Math.min(m, _va.distanceTo(_vb));
+  }
+  return m - A.r - B.r;
+}
+function vesselBlocked(o, pos, fwd) { // would this move push o further into another boat or sub?
+  if (o.pos.lengthSq() < 1) return false; // not placed yet
+  for (const list of [boats, subs]) for (const v of list) {
+    if (v === o || v.pos.lengthSq() < 1 || v.pos.distanceToSquared(pos) > 0.25) continue;
+    const g = vesselGap(o, pos, fwd, v);
+    if (g < 0 && g < vesselGap(o, o.pos, o.fwd, v) - 1e-6) return true;
+  }
+  return false;
+}
+// position on an autopilot vessel's circular route
+function circlePose(o, phi, up, fwd) {
+  const ca = Math.cos(o.a), sa = Math.sin(o.a), cp = Math.cos(phi), sp = Math.sin(phi);
+  up.copy(o.c).multiplyScalar(ca).addScaledVector(o.t1, sa * cp).addScaledVector(o.t2, sa * sp).normalize();
+  fwd.copy(o.t1).multiplyScalar(-sp).addScaledVector(o.t2, cp).multiplyScalar(Math.sign(o.w));
+  fwd.addScaledVector(up, -fwd.dot(up)).normalize();
+}
+// autopilot: move on if the way is clear; otherwise wait, and turn back if still blocked after 3 seconds
+function autoVesselStep(o, phi, depth, dt) {
+  circlePose(o, phi, _vu2, _vf2);
+  _vp2.copy(_vu2).multiplyScalar(depth === null ? R : R - 0.035 - depth);
+  if (!vesselBlocked(o, _vp2, _vf2)) { o.phi = phi; o.up.copy(_vu2); o.fwd.copy(_vf2); o.wait = 0; return true; }
+  if ((o.wait = (o.wait || 0) + dt) > 3) { o.w = -o.w; o.wait = 0; }
+  return false;
+}
+function updateBoats(dt, time) {
+  boats.forEach((b, i) => {
+    if (b.manual) { driveSurface(b, dt, BOAT_DRIVE); b.pos.setLength(R + Math.sin(time * 3 + i) * 0.004); }
+    else {
+      if (b.pos.lengthSq() < 1) circlePose(b, b.phi, b.up, b.fwd); // first placement
+      else autoVesselStep(b, b.phi + b.w * dt, null, dt);
+      b.pos.copy(b.up).multiplyScalar(R + Math.sin(time * 3 + i) * 0.004);
+    }
+    const m = frameMatrix(b.pos, b.up, b.fwd);
+    boatHull.setMatrixAt(i, m); boatCabin.setMatrixAt(i, m); boatStack.setMatrixAt(i, m); boatWake.setMatrixAt(i, m);
+  });
+  [boatHull, boatCabin, boatStack, boatWake].forEach(m => m.instanceMatrix.needsUpdate = true);
+}
+
+// ---------- submarines ----------
+const subs = [];
+const maxDepthAt = dir => { const h = terrainH(dir); return h < 0 ? Math.max(0, -h * SEA - 0.12) : 0; };
+function buildSub(color) {
+  const g = new THREE.Group(), body = comicMat(color), dark = comicMat('#3b3552'), glass = comicMat('#9fe7ff');
+  const add = (geo, mat, ol = true) => { const m = new THREE.Mesh(geo, mat); if (ol) outline(m, 2, 4); g.add(m); return m; };
+  add(new THREE.CapsuleGeometry(0.055, 0.2, 6, 16).rotateX(Math.PI / 2), body);
+  add(new THREE.CapsuleGeometry(0.026, 0.04, 4, 12).rotateX(Math.PI / 2).scale(1, 1.3, 1).translate(0, 0.07, 0.02), body);
+  add(new THREE.CylinderGeometry(0.006, 0.006, 0.07, 6).translate(0, 0.12, 0.035), dark);
+  add(new THREE.BoxGeometry(0.008, 0.008, 0.025).translate(0, 0.155, 0.045), dark);
+  for (const z of [0.07, 0, -0.07]) for (const x of [-1, 1]) add(new THREE.SphereGeometry(0.014, 10, 8).scale(0.4, 1, 1).translate(x * 0.053, 0.01, z), glass, false);
+  add(new THREE.BoxGeometry(0.16, 0.008, 0.035).translate(0, 0, -0.14), body);
+  add(new THREE.BoxGeometry(0.008, 0.09, 0.035).translate(0, 0, -0.14), body);
+  const prop = add(new THREE.BoxGeometry(0.07, 0.012, 0.004), dark, false); prop.position.z = -0.175;
+  return { g, prop };
+}
+{
+  const d = new V3(), colors = ['#ffd23f', '#ff9f1c', '#ff5d73', '#06d6a0', '#b388ff', '#4cc9f0'];
+  // prefer deep water, relaxing the requirement if this world doesn't have much of it
+  for (let t = 0; t < 12000 && subs.length < 6; t++) {
+    const need = t < 4000 ? -0.6 : t < 8000 ? -0.45 : -0.36;
+    randDir(d); const a = rr(0.08, 0.24);
+    let ok = true;
+    for (let i = 0; i < 24 && ok; i++) { const q = offsetDir(d, a, i / 24 * TAU); if (terrainH(q) > need || Math.abs(q.y) > 0.9) ok = false; }
+    if (!ok || subs.some(s => angle(s.c, d) < 0.3)) continue;
+    const { g, prop } = buildSub(colors[subs.length]);
+    world.add(g);
+    const [t1, t2] = basisOf(d.clone());
+    subs.push({ kind: 'sub', g, prop, c: d.clone(), a, t1, t2, phi: rand() * TAU, w: rr(0.2, 0.3) / (Math.sin(a) * R) * (rand() < 0.5 ? -1 : 1), ph: rand() * TAU,
+      depth: 0.1, pitchS: 0, pitchT: 0, emit: 0, pos: new V3(), fwd: new V3(), up: new V3() });
+  }
+}
+function updateSubs(dt, time) {
+  for (const s of subs) {
+    const floor = () => maxDepthAt(s.up), d0 = s.depth;
+    if (s.manual) {
+      driveSurface(s, dt, SUB_DRIVE);
+      let dz = s === driven ? axis('dive', 'rise') : 0;
+      if (s.climbing) dz = Math.min(dz, -1.8); // shallower water ahead: rise over it
+      s.depth = clamp(s.depth + dz * 0.15 * dt, 0, floor());
+      if (vesselBlocked(s, _vp2.copy(s.up).multiplyScalar(R - 0.035 - s.depth), s.fwd)) s.depth = d0; // something above/below
+    } else {
+      const target = Math.min(0.6 + 0.6 * Math.sin(time * 0.15 + s.ph), floor()); // dives, then surfaces now and then
+      if (s.pos.lengthSq() < 1) { circlePose(s, s.phi, s.up, s.fwd); s.depth = target; }
+      else if (autoVesselStep(s, s.phi + s.w * dt, target, dt)) s.depth = target;
+    }
+    s.pos.copy(s.up).multiplyScalar(R - 0.035 - s.depth);
+    // nose follows the actual path: tip down when diving, up when surfacing
+    const rise = (d0 - s.depth) / Math.max(dt, 1e-3), fwdSpeed = s.manual ? Math.abs(s.v) : Math.abs(s.w) * Math.sin(s.a) * R;
+    s.pitchT = clamp(-Math.atan2(rise * 2, Math.max(fwdSpeed, 0.08)), -0.6, 0.6); // exaggerated x2, cartoon-style, so it reads
+    s.pitchS = lerp(s.pitchS, s.pitchT, 1 - Math.exp(-dt * 3));
+    frameMatrix(s.pos, s.up, s.fwd).multiply(new THREE.Matrix4().makeRotationX(s.pitchS)).decompose(s.g.position, s.g.quaternion, s.g.scale);
+    s.prop.rotation.z += dt * (s.manual ? 4 + Math.abs(s.v) * 40 : 18);
+    s.emit -= dt;
+    if (s.depth > 0.05 && s.emit <= 0) {
+      s.emit = 0.1;
+      spawnPuff(_pm2.copy(s.pos).addScaledVector(s.fwd, -0.19).addScaledVector(s.up, rr(-0.01, 0.01)), rr(0.007, 0.013), 1.6, 0.3, _t.copy(s.up).multiplyScalar(0.12), true);
+    }
+  }
+}
+
+// ---------- fish schools (the odd one jumps) ----------
+const schools = [], allFish = [], FISH_PER = 10;
+let fishMesh;
+{
+  const white = [1, 1, 1], black = [0.08, 0.06, 0.12];
+  const colored = (geo, c) => { const n = geo.attributes.position.count, a = []; for (let i = 0; i < n; i++) a.push(...c); geo.setAttribute('color', new THREE.Float32BufferAttribute(a, 3)); return geo; };
+  const parts = [
+    colored(new THREE.SphereGeometry(1, 9, 6).scale(0.011, 0.017, 0.03), white),
+    colored(new THREE.ConeGeometry(0.016, 0.024, 4).rotateX(Math.PI / 2).scale(0.3, 1, 1).translate(0, 0, -0.038), white),
+    colored(new THREE.SphereGeometry(0.0038, 6, 4).translate(0.0085, 0.005, 0.017), black),
+    colored(new THREE.SphereGeometry(0.0038, 6, 4).translate(-0.0085, 0.005, 0.017), black),
+  ];
+  fishMesh = makeInstanced(mergeGeometries(parts), comicMat('#fff', { vertexColors: true }), 260, 1.2, 3);
+  const fishColors = ['#ff7b00', '#ffd23f', '#ff5d73', '#4cc9f0', '#c3f73a', '#b388ff', '#ff87ab'];
+  const d = new V3();
+  for (let t = 0; t < 8000 && schools.length < 24; t++) {
+    randDir(d); const a = rr(0.05, 0.18);
+    let shallowest = -9, ok = true;
+    for (let i = 0; i < 16 && ok; i++) { const q = offsetDir(d, a, i / 16 * TAU), h = terrainH(q); shallowest = Math.max(shallowest, h); if (h > -0.28 || Math.abs(q.y) > 0.9) ok = false; }
+    if (!ok) continue;
+    const [t1, t2] = basisOf(d.clone()), base = pick(fishColors), fish = [];
+    for (let k = 0; k < FISH_PER; k++) {
+      const idx = schools.length * FISH_PER + k;
+      fishMesh.setColorAt(idx, _col.set(base).offsetHSL(rr(-0.03, 0.03), 0, rr(-0.06, 0.06)));
+      const fsh = { idx, o: new V3(rr(-0.06, 0.06), rr(-0.025, 0.025), rr(-0.08, 0.08)), ph: rand() * TAU, jump: -99, pos: new V3(), up: new V3(0, 1, 0), fwd: new V3(0, 0, 1), v: 0, depth: 0.1 };
+      fish.push(fsh); allFish.push(fsh);
+    }
+    schools.push({ c: d.clone(), a, t1, t2, phi: rand() * TAU, w: rr(0.12, 0.25) / (Math.sin(a) * R) * (rand() < 0.5 ? -1 : 1),
+      depth: Math.min(rr(0.06, 0.6), -shallowest * SEA - 0.05), fish, nextJump: rr(2, 12), up: new V3(), fwd: new V3() });
+  }
+  finalize(fishMesh, schools.length * FISH_PER);
+}
+const _fr = new V3(), _ff = new V3(), _fp = new V3(), _fm = new THREE.Matrix4();
+function updateFish(dt, time) {
+  for (const sc of schools) {
+    sc.phi += sc.w * dt;
+    const ca = Math.cos(sc.a), sa = Math.sin(sc.a), cp = Math.cos(sc.phi), sp = Math.sin(sc.phi);
+    sc.up.copy(sc.c).multiplyScalar(ca).addScaledVector(sc.t1, sa * cp).addScaledVector(sc.t2, sa * sp).normalize();
+    sc.fwd.copy(sc.t1).multiplyScalar(-sp).addScaledVector(sc.t2, cp).multiplyScalar(Math.sign(sc.w));
+    sc.fwd.addScaledVector(sc.up, -sc.fwd.dot(sc.up)).normalize();
+    _fr.crossVectors(sc.fwd, sc.up);
+    sc.nextJump -= dt;
+    if (sc.nextJump <= 0) { sc.nextJump = rr(4, 14); const f = pick(sc.fish); if (sc.depth < 0.3 && time - f.jump > 1.5) f.jump = time; }
+    for (const f of sc.fish) {
+      const j = (time - f.jump) / 1.1; // 0..1 while jumping
+      const leap = j >= 0 && j < 1;
+      let up = sc.up;
+      if (f.manual) { swimFish(f, dt); up = f.up; _fp.copy(f.pos); if (leap) _fp.addScaledVector(f.up, Math.sin(Math.PI * j) * (f.depth + 0.14)); }
+      else {
+        const o = f.o, wob = Math.sin(time * 1.3 + f.ph);
+        let rad = R - sc.depth + o.y + wob * 0.008;
+        _fp.copy(sc.up).multiplyScalar(rad).addScaledVector(_fr, o.x + wob * 0.01).addScaledVector(sc.fwd, o.z + (leap ? j * 0.22 : 0));
+        if (leap) _fp.addScaledVector(sc.up, Math.sin(Math.PI * j) * (sc.depth + 0.12));
+        f.pos.copy(_fp); f.up.copy(sc.up); f.fwd.copy(sc.fwd);
+      }
+      // tail wiggle: advance a running phase (rather than sin(time * rate)) so changing speed never makes it jump;
+      // a fish you're steering beats gently when cruising and a little faster when dashing
+      f.wig = (f.wig ?? f.ph) + dt * (f.manual ? 3 + Math.abs(f.v) * 10 : 9);
+      _ff.copy(f.fwd).applyAxisAngle(up, Math.sin(f.wig) * (f.manual ? 0.22 : 0.3));
+      frameMatrix(_fp, up, _ff);
+      if (leap) _m.multiply(_fm.makeRotationX(-Math.cos(Math.PI * j) * 0.9));
+      else if (f.manual) _m.multiply(_fm.makeRotationX(f.pitch || 0));
+      fishMesh.setMatrixAt(f.idx, _m);
+      if (leap && !f.splashed && j > 0.08) { f.splashed = true; splash(_fp); }
+      if (leap && f.splashed === true && j > 0.9) { f.splashed = 2; splash(_fp); }
+      if (!leap) f.splashed = false;
+    }
+  }
+  fishMesh.instanceMatrix.needsUpdate = true;
+}
+// a fish you control: W/S swim, A/D turn, Q dive, E rise (and at the surface, E leaps out)
+function swimFish(f, dt) {
+  const me = f === driven;
+  const thr = me ? axis('f', 'b') : 0, turn = me ? axis('l', 'r') : 0, dz = me ? axis('dive', 'rise') : 0;
+  f.v = clamp(lerp(f.v, Math.max(0, thr) * (me && keys.boost ? 0.55 : 0.28), 1 - Math.exp(-dt * 3)), 0, 0.6);
+  f.fwd.applyAxisAngle(f.up, turn * 2.2 * dt);
+  _pn.copy(f.up).addScaledVector(f.fwd, f.v * dt / R).normalize();
+  const h = terrainH(_pn);
+  if (h < -0.05 && !iceTag(_pn)) f.up.copy(_pn); else f.v = 0; // stay in open water
+  f.fwd.addScaledVector(f.up, -f.fwd.dot(f.up)).normalize();
+  const hh = terrainH(f.up), floor = Math.max(0.015, -hh * SEA - 0.03);
+  const d0 = f.depth;
+  f.depth = clamp(f.depth + dz * 0.2 * dt, 0.015, floor);
+  const rise = (d0 - f.depth) / Math.max(dt, 1e-3);
+  f.pitch = lerp(f.pitch || 0, clamp(-Math.atan2(rise, Math.max(f.v, 0.06)), -0.8, 0.8), 1 - Math.exp(-dt * 5)); // nose up when rising
+  if (dz < 0 && f.depth <= 0.02 && f.v > 0.08 && time - f.jump > 1.3) f.jump = time; // leap!
+  f.pos.copy(f.up).multiplyScalar(R - f.depth);
+}
+function splash(p) {
+  for (let i = 0; i < 4; i++) spawnPuff(_pm2.copy(p).setLength(R + 0.01).add(_t.set(rr(-0.02, 0.02), rr(-0.02, 0.02), rr(-0.02, 0.02))), rr(0.012, 0.02), 0.6, 0.5);
+}
+
+// seaweed on the sea floor, and coral reefs in the shallows
+{
+  const weeds = makeInstanced(new THREE.ConeGeometry(0.012, 0.1, 5).translate(0, 0.05, 0), comicMat('#fff'), 900, 1, 3);
+  liteMeshes.push(weeds);
+  let nw = 0; const d = new V3();
+  for (let t = 0; t < 30000 && nw < 900; t++) {
+    randDir(d); const h = terrainH(d);
+    if (h > -0.1 || h < -1.1) continue;
+    if (noise(d.x * 6 + 3, d.y * 6, d.z * 6) < 0.05) continue; // clumps
+    const s = rr(0.7, 1.6);
+    weeds.setMatrixAt(nw, surfaceMatrix(d.clone(), R + h * SEA - 0.005, rand() * TAU, s, s * rr(0.6, 2.2), s));
+    weeds.setColorAt(nw++, _col.setHSL(rr(0.25, 0.42), 0.65, rr(0.3, 0.45)));
+  }
+  finalize(weeds, nw);
+  cullableInstances.push(weeds);
+
+  // four coral shapes, all built about 0.06 tall with the base at y=0
+  // coral is underwater and tinted by the sea, so it uses simple shapes and no outlines (it was a third of all drawing)
+  const cyl = (r0, r1, h) => new THREE.CylinderGeometry(r0, r1, h, 5).translate(0, h / 2, 0);
+  const branchy = mergeGeometries([cyl(0.006, 0.009, 0.03),
+    ...[0, 1, 2, 3, 4].map(i => cyl(0.0035, 0.0055, 0.035).rotateZ(0.55 + (i % 2) * 0.25).rotateY(i * TAU / 5).translate(0, 0.026, 0))]);
+  const fan = mergeGeometries([cyl(0.004, 0.005, 0.02), new THREE.CylinderGeometry(0.034, 0.034, 0.004, 9, 1, false, 0, Math.PI).rotateX(Math.PI / 2).rotateZ(Math.PI / 2).translate(0, 0.018, 0)]);
+  const tubes = mergeGeometries([[0, 0, 0.06], [0.013, 0.004, 0.045], [-0.01, 0.01, 0.038], [0.004, -0.013, 0.05], [-0.012, -0.008, 0.03]]
+    .map(([x, z, h]) => cyl(0.0065, 0.0075, h).translate(x, 0, z)));
+  const brain = new THREE.IcosahedronGeometry(1, 1).scale(0.032, 0.022, 0.032);
+  const kinds = [branchy, fan, tubes, brain].map(g => makeInstanced(g, comicMat('#fff'), 700));
+  liteMeshes.push(...kinds);
+  const counts = [0, 0, 0, 0];
+  const coralColors = ['#ff87ab', '#ff7b00', '#b388ff', '#ff5d73', '#ffd23f', '#4df0ff', '#c3f73a', '#ff4d8d', '#ffffff'];
+  const center = new V3();
+  // reefs: clusters of mixed coral on shallow-to-mid sea floor
+  for (let t = 0; t < 20000 && counts.reduce((a, b) => a + b) < 2600; t++) {
+    randDir(center); const hc = terrainH(center);
+    if (hc > -0.1 || hc < -0.6) continue;
+    const reefCols = [pick(coralColors), pick(coralColors), pick(coralColors)];
+    const size = rr(0.025, 0.06), n = 20 + Math.floor(rand() * 40);
+    for (let k = 0; k < n; k++) {
+      const p = offsetDir(center, Math.sqrt(rand()) * size, rand() * TAU), h = terrainH(p);
+      if (h > -0.06) continue;
+      const kind = Math.floor(rand() * 4), m = kinds[kind];
+      if (counts[kind] >= 700) continue;
+      const sc = rr(0.7, 1.8);
+      m.setMatrixAt(counts[kind], surfaceMatrix(p, R + h * SEA - 0.006, rand() * TAU, sc, sc * rr(0.8, 1.3), sc));
+      m.setColorAt(counts[kind]++, _col.set(rand() < 0.8 ? pick(reefCols) : pick(coralColors)));
+    }
+  }
+  kinds.forEach((m, i) => finalize(m, counts[i]));
+  cullableInstances.push(...kinds);
+}
+
+// ---------- clouds ----------
+const clouds = [];
+const cloudMesh = makeInstanced(new THREE.IcosahedronGeometry(1, 2), comicMat('#ffffff'), 260, 2, 9);
+{
+  let n = 0;
+  for (let i = 0; i < 34; i++) {
+    const dir = randDir(), axis = new V3().crossVectors(dir, randDir()).normalize();
+    const puffs = [], k = 3 + Math.floor(rand() * 4);
+    for (let j = 0; j < k && n < 260; j++, n++) {
+      const mid = 1 - Math.abs(j - (k - 1) / 2) / k;
+      puffs.push({ o: new V3((j - (k - 1) / 2) * 0.32 + rr(-0.08, 0.08), rr(0, 0.12) * mid, rr(-0.18, 0.18)), s: rr(0.22, 0.32) + mid * 0.2, idx: n });
+    }
+    clouds.push({ dir, axis, alt: rr(12.5, 13.3), speed: rr(0.012, 0.035), puffs, ang: 0 });
+  }
+  finalize(cloudMesh, n);
+}
+const _cm = new THREE.Matrix4(), _cp = new V3(), _cu = new V3(), _cf = new V3(), _cx = new V3();
+function updateClouds(dt) {
+  for (const c of clouds) {
+    c.ang += c.speed * dt;
+    _cu.copy(c.dir).applyAxisAngle(c.axis, c.ang);
+    _cf.crossVectors(c.axis, _cu).normalize();
+    _cx.crossVectors(_cf, _cu);
+    for (const p of c.puffs) {
+      _cp.copy(_cu).multiplyScalar(c.alt).addScaledVector(_cf, p.o.x).addScaledVector(_cu, p.o.y).addScaledVector(_cx, p.o.z);
+      _cm.makeBasis(_cf.clone().multiplyScalar(p.s), _cu.clone().multiplyScalar(p.s * 0.78), _cx.clone().multiplyScalar(p.s)).setPosition(_cp);
+      cloudMesh.setMatrixAt(p.idx, _cm);
+    }
+  }
+  cloudMesh.instanceMatrix.needsUpdate = true;
+}
+
+// ---------- birds: flocks flapping about low over the land, in loose V formations ----------
+const flocks = [], allBirds = [];
+const BIRDS_PER = 7;
+const birdBody = makeInstanced(new THREE.SphereGeometry(1, 10, 6).scale(0.0075, 0.007, 0.019), comicMat('#fff'), 120, 1, 3);
+const birdBeak = makeInstanced(new THREE.ConeGeometry(0.003, 0.009, 5).rotateX(Math.PI / 2).translate(0, 0.001, 0.022), comicMat('#ffb02e'), 120);
+const wingGeo = s => new THREE.BoxGeometry(0.034, 0.002, 0.013).translate(s * 0.017, 0, 0);
+const birdWingL = makeInstanced(wingGeo(1), comicMat('#fff'), 120, 1, 3), birdWingR = makeInstanced(wingGeo(-1), comicMat('#fff'), 120, 1, 3);
+{
+  const kinds = [['#ffffff', '#e8e4f2'], ['#3b3552', '#5c5470'], ['#ff5d73', '#4cc9f0'], ['#ffd23f', '#06d6a0'], ['#8d86a8', '#ffffff']];
+  let n = 0;
+  for (let i = 0; i < 16 && n + BIRDS_PER <= 120; i++) {
+    const dir = randDir(), axis = new V3().crossVectors(dir, randDir()).normalize(), [body, wing] = pick(kinds);
+    const birds = [];
+    for (let k = 0; k < BIRDS_PER; k++, n++) {
+      const row = Math.ceil(k / 2), side = k === 0 ? 0 : k % 2 ? 1 : -1; // V formation
+      const bird = { idx: n, o: new V3(side * row * 0.06 + rr(-0.01, 0.01), rr(-0.015, 0.015), -row * 0.055), ph: rand() * TAU, pos: new V3(), up: new V3(0, 1, 0), fwd: new V3(0, 0, 1), av: new V3(), v: 0.5, alt: 11, bank: 0, pitch: 0 };
+      birds.push(bird); allBirds.push(bird);
+      birdBody.setColorAt(n, _col.set(body)); birdWingL.setColorAt(n, _col.set(wing)); birdWingR.setColorAt(n, _col.set(wing));
+    }
+    flocks.push({ dir, axis, ang: 0, speed: rr(0.025, 0.045) * (rand() < 0.5 ? -1 : 1), height: rr(0.45, 1.1), alt: 12, turn: rand() * TAU, birds, up: new V3(), fwd: new V3() });
+  }
+  [birdBody, birdBeak, birdWingL, birdWingR].forEach(m => finalize(m, n));
+}
+const _bdp = new V3(), _bdr = new V3(), _bw = new THREE.Matrix4(), _bwr = new THREE.Matrix4(), _bwt = new THREE.Matrix4(), _bm = new THREE.Matrix4();
+const _bav = new V3(), _bd2 = new V3(), _bc = new V3(), _jr = new V3(), _jc = new V3();
+const flockCentre = (f, out) => out.copy(f.up).multiplyScalar(f.alt);
+function nearestFlock(pos, skip) {
+  let best = null, bd = Infinity;
+  for (const f of flocks) {
+    if (f === skip || !f.birds.some(x => !x.manual)) continue;
+    const d = flockCentre(f, _jc).distanceTo(pos);
+    if (d < bd) { bd = d; best = f; }
+  }
+  return { f: best, d: bd };
+}
+// a lone bird slots into the next free place in a flock's V and glides into position
+function joinFlock(b, f) {
+  const old = flocks.find(q => q.birds.includes(b));
+  if (old) old.birds.splice(old.birds.indexOf(b), 1);
+  const k = f.birds.filter(x => !x.manual).length, row = Math.ceil(k / 2), side = k === 0 ? 0 : k % 2 ? 1 : -1;
+  b.o.set(side * row * 0.06 + rr(-0.01, 0.01), rr(-0.015, 0.015), -row * 0.055);
+  f.birds.push(b);
+  _jr.crossVectors(f.fwd, f.up);
+  _jc.copy(f.up).multiplyScalar(f.alt + b.o.y).addScaledVector(_jr, b.o.x).addScaledVector(f.fwd, b.o.z);
+  b.av.subVectors(b.pos, _jc); // start from where we are; this offset eases away to nothing
+  b.joining = 1.5; b.manual = false; b.idle = 0;
+  if (b === driven) { driven = null; hint.textContent = 'You joined a flock! Press WASD to fly off on your own again'; }
+}
+function updateBirds(dt, time) {
+  const joins = [];
+  for (const f of flocks) {
+    f.ang += f.speed * dt;
+    f.axis.applyAxisAngle(f.dir, Math.sin(time * 0.05 + f.turn) * 0.004); // wander
+    f.up.copy(f.dir).applyAxisAngle(f.axis, f.ang).normalize();
+    f.fwd.crossVectors(f.axis, f.up).multiplyScalar(Math.sign(f.speed)).normalize();
+    const a0 = f.alt;
+    f.alt = lerp(f.alt, surfaceR(f.up) + f.height, 1 - Math.exp(-dt * 1.5)); // hop up over hills
+    const climbRate = (f.alt - a0) / Math.max(dt, 1e-3), flockSpeed = Math.abs(f.speed) * f.alt;
+    f.pitch = lerp(f.pitch || 0, clamp(-Math.atan2(climbRate, Math.max(flockSpeed, 0.1)), -0.8, 0.8), 1 - Math.exp(-dt * 4));
+    _bdr.crossVectors(f.fwd, f.up);
+    for (const b of f.birds) {
+      let flapRate = 11;
+      if (b.manual) {
+        flapRate = flyBird(b, dt);
+        // found a flock? join it (a bird you're flying joins once you let go of the keys)
+        const near = nearestFlock(b.pos, null);
+        if (near.f && near.d < 0.3 && (b !== driven || b.idle > 1.2)) joins.push([b, near.f]);
+      } else {
+        const bob = Math.sin(time * 2 + b.ph) * 0.008;
+        b.pos.copy(f.up).multiplyScalar(f.alt + b.o.y + bob).addScaledVector(_bdr, b.o.x).addScaledVector(f.fwd, b.o.z);
+        b.up.copy(f.up); b.fwd.copy(f.fwd); b.bank = 0; b.pitch = f.pitch; // the whole flock tips up/down together
+        // swerve out of the way of planes and balloons
+        _bav.set(0, 0, 0);
+        for (const pl of planes) {
+          _bd2.subVectors(b.pos, pl.pos); const d = _bd2.length();
+          if (d < 0.55) _bav.addScaledVector(_bd2, (0.55 - d) / Math.max(d, 1e-3) * 1.5);
+        }
+        for (const bl of balloons) {
+          _bc.copy(bl.pos).addScaledVector(bl.up, -0.1);
+          _bd2.subVectors(b.pos, _bc); const d = _bd2.length();
+          if (d < 0.45) _bav.addScaledVector(_bd2, (0.45 - d) / Math.max(d, 1e-3) * 1.5);
+        }
+        b.joining = Math.max(0, (b.joining || 0) - dt);
+        b.av.lerp(_bav, 1 - Math.exp(-dt * (b.joining > 0 ? 1.8 : 6)));
+        b.pos.add(b.av);
+        if (b.av.lengthSq() > 1e-4) flapRate = 18; // frantic flapping while dodging or catching up
+      }
+      _bm.copy(frameMatrix(b.pos, b.up, b.fwd)).multiply(_bwr.makeRotationZ(b.bank)).multiply(_bwt.makeRotationX(b.pitch));
+      birdBody.setMatrixAt(b.idx, _bm); birdBeak.setMatrixAt(b.idx, _bm);
+      b.flapPh = (b.flapPh ?? b.ph) + dt * flapRate; // running phase, so changing flap speed never makes the wings jump
+      const flap = Math.sin(b.flapPh) * 0.65 + 0.15;
+      birdWingL.setMatrixAt(b.idx, _bw.copy(_bm).multiply(_bwt.makeTranslation(0.005, 0.002, 0)).multiply(_bwr.makeRotationZ(flap)));
+      birdWingR.setMatrixAt(b.idx, _bw.copy(_bm).multiply(_bwt.makeTranslation(-0.005, 0.002, 0)).multiply(_bwr.makeRotationZ(-flap)));
+    }
+  }
+  for (const [b, f] of joins) joinFlock(b, f);
+  [birdBody, birdBeak, birdWingL, birdWingR].forEach(m => m.instanceMatrix.needsUpdate = true);
+}
+// a solo bird: yours (A/D turn, W climb, S dive, Shift speed up) or one you've let go of, which heads for the nearest flock.
+// Returns how fast to flap.
+function flyBird(b, dt) {
+  const me = b === driven;
+  let turn = me ? axis('l', 'r') : 0, climb = me ? axis('f', 'b') : 0;
+  if (me) b.idle = turn || climb || keys.boost ? 0 : (b.idle || 0) + dt;
+  else {
+    const near = nearestFlock(b.pos, null);
+    if (near.f) { // steer toward it and match its height
+      flockCentre(near.f, _jc).sub(b.pos);
+      _jr.crossVectors(b.fwd, b.up);
+      turn = clamp(-_jc.dot(_jr) * 8, -1, 1);
+      climb = clamp((near.f.alt - b.alt) * 3, -1, 1);
+    }
+  }
+  b.v = lerp(b.v, me && keys.boost ? 1.0 : 0.5, 1 - Math.exp(-dt * 2));
+  b.fwd.applyAxisAngle(b.up, turn * 1.8 * dt);
+  b.up.addScaledVector(b.fwd, b.v * dt / b.alt).normalize();
+  b.fwd.addScaledVector(b.up, -b.fwd.dot(b.up)).normalize();
+  const a0 = b.alt;
+  b.alt = clamp(b.alt + climb * 0.6 * dt, surfaceR(b.up) + 0.06, 16);
+  b.pos.copy(b.up).multiplyScalar(b.alt);
+  b.bank = lerp(b.bank, -turn * 0.5, 1 - Math.exp(-dt * 4));
+  const rise = (b.alt - a0) / Math.max(dt, 1e-3);
+  b.pitch = lerp(b.pitch, clamp(-Math.atan2(rise, Math.max(b.v, 0.1)), -0.8, 0.8), 1 - Math.exp(-dt * 4)); // nose along the real flight path
+  return climb > 0 ? 16 : climb < 0 ? 4 : 10 + b.v * 4; // glide when diving, flap hard when climbing
+}
+
+// ---------- planes + contrails ----------
+const planes = [];
+const planeStyles = [['#ff4d4d', '#ffffff'], ['#ffd23f', '#3a86ff'], ['#8338ec', '#ffbe0b'], ['#06d6a0', '#ef476f'], ['#ffffff', '#ff7b00']];
+function buildPlane(body, wing) {
+  const g = new THREE.Group(), mb = comicMat(body), mw = comicMat(wing);
+  const add = (geo, mat, x = 0, y = 0, z = 0, ol = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (ol) outline(m, 2.5, 4); g.add(m); return m; };
+  add(new THREE.CylinderGeometry(0.045, 0.028, 0.5, 14).rotateX(Math.PI / 2), mb);
+  add(new THREE.SphereGeometry(0.045, 14, 10), mw, 0, 0, 0.25);
+  add(new THREE.BoxGeometry(0.62, 0.014, 0.11), mw, 0, -0.01, 0.04);
+  add(new THREE.BoxGeometry(0.22, 0.01, 0.06), mw, 0, 0.005, -0.22);
+  add(new THREE.BoxGeometry(0.012, 0.11, 0.07), mb, 0, 0.055, -0.22);
+  add(new THREE.SphereGeometry(0.034, 12, 8).scale(1, 0.8, 1.5), comicMat('#9fe7ff'), 0, 0.036, 0.09);
+  const prop = add(new THREE.BoxGeometry(0.18, 0.02, 0.006), comicMat('#221c33'), 0, 0, 0.3, false);
+  return { g, prop };
+}
+for (let i = 0; i < 5; i++) {
+  const { g, prop } = buildPlane(...planeStyles[i]);
+  world.add(g);
+  const u = randDir(), v = new V3().crossVectors(u, randDir()).normalize();
+  planes.push({ g, prop, u, v, prec: randDir(), theta: rand() * TAU, speed: rr(0.07, 0.1), alt: rr(13.9, 15.2), ph: rand() * TAU, emit: 0, pos: new V3(), fwd: new V3(), up: new V3() });
+}
+const PUFFS = 1400, puffs = [];
+const puffMesh = makeInstanced(new THREE.IcosahedronGeometry(1, 1), comicMat('#ffffff'), PUFFS);
+for (let i = 0; i < PUFFS; i++) puffs.push({ pos: new V3(), vel: new V3(), col: new THREE.Color('#ffffff'), t0: -99, size: 0, life: 1, grow: 0, water: false });
+const _pcol = new THREE.Color();
+function spawnPuff(pos, size, life, grow = 0, vel = null, water = false, color = '#ffffff') {
+  const i = puffHead, q = puffs[i]; puffHead = (puffHead + 1) % PUFFS;
+  q.pos.copy(pos); q.t0 = time; q.size = size; q.life = life; q.grow = grow; q.water = water;
+  vel ? q.vel.copy(vel) : q.vel.set(0, 0, 0);
+  q.col.set(color);
+}
+for (let i = 0; i < PUFFS; i++) puffMesh.setColorAt(i, _pcol.set('#ffffff'));
+finalize(puffMesh, PUFFS);
+let puffHead = 0;
+const _zero = new THREE.Matrix4().makeScale(0, 0, 0), _pm = new THREE.Matrix4(), _pm2 = new V3();
+function updatePlanes(dt, time) {
+  for (const p of planes) {
+    let bank, pitch = 0;
+    if (p.manual) { ({ bank, pitch } = flyPlane(p, dt)); }
+    else {
+    p.theta += p.speed * dt;
+    p.u.applyAxisAngle(p.prec, 0.02 * dt); p.v.applyAxisAngle(p.prec, 0.02 * dt);
+    const alt = p.alt + Math.sin(time * 0.4 + p.ph) * 0.25;
+    const ct = Math.cos(p.theta), st = Math.sin(p.theta);
+    p.up.copy(p.u).multiplyScalar(ct).addScaledVector(p.v, st).normalize();
+    p.pos.copy(p.up).multiplyScalar(alt);
+    p.fwd.copy(p.u).multiplyScalar(-st).addScaledVector(p.v, ct);
+    p.fwd.addScaledVector(p.up, -p.fwd.dot(p.up)).normalize();
+    bank = Math.sin(time * 0.35 + p.ph) * 0.3;
+    }
+    const m = frameMatrix(p.pos, p.up, p.fwd).multiply(new THREE.Matrix4().makeRotationZ(bank)).multiply(new THREE.Matrix4().makeRotationX(pitch));
+    m.decompose(p.g.position, p.g.quaternion, p.g.scale);
+    p.prop.rotation.z += dt * (p.manual ? 25 + p.v * 25 : 45);
+    p.emit -= dt;
+    if (p.emit <= 0) {
+      p.emit = 0.07;
+      spawnPuff(_pm2.copy(p.pos).addScaledVector(p.fwd, -0.3), 0.055, 2.6);
+    }
+  }
+  // only the live puffs are drawn: they're packed into the first slots each frame
+  let live = 0;
+  for (const q of puffs) {
+    const age = time - q.t0;
+    if (age > q.life || (q.water && q.pos.lengthSq() > R * R)) { q.t0 = -99; continue; }
+    q.pos.addScaledVector(q.vel, dt);
+    const s = q.size * (age < 0.2 ? age / 0.2 : 1 - (age - 0.2) / (q.life - 0.2)) * (1 + age * q.grow) + 0.001;
+    puffMesh.setMatrixAt(live, _pm.makeScale(s, s, s).setPosition(q.pos));
+    puffMesh.setColorAt(live++, q.col);
+  }
+  puffMesh.count = live;
+  puffMesh.instanceMatrix.needsUpdate = true; puffMesh.instanceColor.needsUpdate = true;
+}
+
+// ---------- hot-air balloons ----------
+const balloons = [];
+const balloonColors = [['#ff5d73', '#ffe14d'], ['#4cc9f0', '#ffffff'], ['#8338ec', '#ff9f1c'], ['#06d6a0', '#ff87ab'],
+  ['#ff9f1c', '#3a86ff'], ['#ffffff', '#e63946'], ['#c3f73a', '#8338ec'], ['#ffe14d', '#06d6a0'], ['#ff87ab', '#4cc9f0'], ['#3a86ff', '#ffe14d']];
+const flameMat = new THREE.MeshBasicMaterial({ color: '#ffb02e' }), flameCore = new THREE.MeshBasicMaterial({ color: '#fff3a0' });
+for (let i = 0; i < balloonColors.length; i++) {
+  const [ca, cb] = balloonColors[i];
+  let eg = new THREE.SphereGeometry(0.15, 16, 12); eg.scale(1, 1.2, 1); eg = eg.toNonIndexed();
+  const pa = eg.attributes.position, cols = [], A = new THREE.Color(ca), B = new THREE.Color(cb);
+  for (let v = 0; v < pa.count; v += 3) {
+    const cx = pa.getX(v) + pa.getX(v + 1) + pa.getX(v + 2), cz = pa.getZ(v) + pa.getZ(v + 1) + pa.getZ(v + 2);
+    const c = Math.floor((Math.atan2(cz, cx) + Math.PI) / TAU * 8) % 2 ? A : B;
+    for (let k = 0; k < 3; k++) cols.push(c.r, c.g, c.b);
+  }
+  eg.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  const g = new THREE.Group();
+  g.add(outline(new THREE.Mesh(eg, comicMat('#fff', { vertexColors: true })), 2, 4));
+  const basket = outline(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.045, 0.06), comicMat('#b07a4f')), 1.5, 4);
+  basket.position.y = -0.27; g.add(basket);
+  const rp = [];
+  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) rp.push(x * 0.027, -0.25, z * 0.027, x * 0.07, -0.15, z * 0.07);
+  const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(rp, 3));
+  g.add(new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: '#140d33' })));
+  const flame = new THREE.Group(); flame.position.y = -0.235;
+  const outer = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.07, 8).rotateX(Math.PI).translate(0, 0.035, 0), flameMat);
+  const inner = new THREE.Mesh(new THREE.ConeGeometry(0.009, 0.045, 8).rotateX(Math.PI).translate(0, 0.0225, 0), flameCore);
+  outline(outer, 1.5, 4); flame.add(outer, inner); g.add(flame);
+  world.add(g);
+  const dir = randDir(), axis = new V3().crossVectors(dir, randDir()).normalize();
+  balloons.push({ g, flame, dir, axis, ang: 0, speed: rr(0.01, 0.02), alt: 11.5, ph: rand() * TAU, pos: new V3(), up: new V3(), fwd: new V3() });
+}
+function updateBalloons(dt, time) {
+  for (const b of balloons) {
+    if (b.manual) flyBalloon(b, dt);
+    else {
+      b.ang += b.speed * dt;
+      b.up.copy(b.dir).applyAxisAngle(b.axis, b.ang);
+      b.fwd.crossVectors(b.axis, b.up).normalize();
+      b.alt = lerp(b.alt, surfaceR(b.up) + 1.6, 1 - Math.exp(-dt * 0.8));
+      b.burn = Math.sin(time * 0.9 + b.ph * 3) > 0.8;
+    }
+    const f = b.burn ? 1 + Math.sin(time * 40 + b.ph) * 0.2 : 0.001;
+    b.flame.scale.set(f, f * (1 + Math.sin(time * 27) * 0.25), f);
+    b.pos.copy(b.up).multiplyScalar(b.alt + Math.sin(time * 0.8 + b.ph) * 0.06);
+    if (b.manual && b.alt < 12) { // basket or envelope hits a building
+      const ob = obstacleAt(b.up);
+      if (ob && ob.top && b.alt - 0.3 < ob.top) knock(ob, b.fwd);
+    }
+    frameMatrix(b.pos, b.up, b.fwd).decompose(b.g.position, b.g.quaternion, b.g.scale);
+  }
+}
+
+// ---------- knockdowns: buildings/houses topple when hit, lie there 3s, then spring back up ----------
+const KNOCK_T = 4.3, knocked = new Set();
+const isDown = q => q.t0 !== undefined && time - q.t0 < KNOCK_T;
+function obstacleAt(dir) {
+  for (const q of obstacles) {
+    q.cosLim ??= Math.cos(q.half * 0.8 + 0.002);
+    if (dir.dot(q.d) > q.cosLim && !isDown(q)) return q;
+  }
+  return null;
+}
+const _kv = new V3(), _kp = new V3(), _k1 = new THREE.Matrix4(), _k2 = new THREE.Matrix4(), _k3 = new THREE.Matrix4();
+function knock(q, dirv) {
+  if (!q.parts || isDown(q)) return;
+  q.t0 = time; q.dusted = false;
+  _kv.copy(dirv).addScaledVector(q.d, -dirv.dot(q.d));
+  if (_kv.lengthSq() < 1e-8) _kv.copy(basisOf(q.d)[0]);
+  q.fall = _kv.clone().normalize();
+  q.axis = new V3().crossVectors(q.d, q.fall).normalize();
+  knocked.add(q);
+}
+function updateKnocks() {
+  for (const q of knocked) {
+    const t = time - q.t0, full = Math.PI / 2 * 0.96;
+    const th = t < 0.45 ? full * (t / 0.45) ** 2 : t < 3.45 ? full : t < KNOCK_T ? full * (1 - smooth(3.45, KNOCK_T, t)) : 0;
+    if (t >= 0.45 && !q.dusted) {
+      q.dusted = true;
+      for (let i = 0; i < 9; i++) spawnPuff(_kp.copy(q.base).addScaledVector(q.fall, rand() * q.height).addScaledVector(q.d, 0.02), rr(0.03, 0.07), 1.6, 1.4, null, false, '#e3d8c6');
+    }
+    _k1.makeTranslation(q.base.x, q.base.y, q.base.z).multiply(_k2.makeRotationAxis(q.axis, th)).multiply(_k3.makeTranslation(-q.base.x, -q.base.y, -q.base.z));
+    for (const pt of q.parts) { pt.mesh.setMatrixAt(pt.idx, _k2.multiplyMatrices(_k1, pt.m0)); pt.mesh.instanceMatrix.needsUpdate = true; }
+    if (t >= KNOCK_T) knocked.delete(q);
+  }
+}
+
+// ---------- people: walkers in and around town, swimmers off the beaches ----------
+const people = [], MAX_PEOPLE = 110;
+const pTorso = makeInstanced(new THREE.CapsuleGeometry(0.0075, 0.013, 4, 8).translate(0, 0.031, 0), comicMat('#fff'), MAX_PEOPLE, 1, 3);
+const pHead = makeInstanced(new THREE.SphereGeometry(0.0085, 10, 8).translate(0, 0.053, 0), comicMat('#fff'), MAX_PEOPLE, 1, 3);
+const pLeg = makeInstanced(new THREE.BoxGeometry(0.0055, 0.02, 0.0055).translate(0, -0.01, 0), comicMat('#fff'), MAX_PEOPLE * 2, 1, 3);
+const pArm = makeInstanced(new THREE.BoxGeometry(0.0045, 0.017, 0.0045).translate(0, -0.0085, 0), comicMat('#fff'), MAX_PEOPLE * 2, 1, 3);
+function addPerson(dir, swimmer) {
+  const i = people.length;
+  const fwd = basisOf(dir)[0].applyAxisAngle(dir, rand() * TAU);
+  const shirt = pick(vivid), skin = pick(['#f6cfae', '#e0a57a', '#b97a4f', '#8a5a3b', '#ffe0c2']), pants = pick(['#3a86ff', '#3b3552', '#8338ec', '#06d6a0', '#ff9f1c', '#5c5470']);
+  pTorso.setColorAt(i, _col.set(shirt)); pHead.setColorAt(i, _col.set(skin));
+  for (const k of [0, 1]) { pLeg.setColorAt(i * 2 + k, _col.set(pants)); pArm.setColorAt(i * 2 + k, _col.set(skin)); }
+  people.push({ i, swimmer, up: dir.clone(), fwd, pos: dir.clone().multiplyScalar(R), v: 0, speed: swimmer ? rr(0.025, 0.045) : rr(0.035, 0.065), phase: rand() * TAU, ph: rand() * TAU, swim: swimmer ? 1 : 0 });
+}
+{
+  const d = new V3();
+  for (let t = 0; t < 20000 && people.length < 80; t++) {
+    const c = pick(cities);
+    d.copy(offsetDir(c.dir, Math.sqrt(rand()) * (c.r + 0.2), rand() * TAU));
+    if (terrainH(d) < 0.02 || obstacleAt(d)) continue;
+    addPerson(d.clone(), false);
+  }
+  for (let t = 0; t < 20000 && people.length < MAX_PEOPLE; t++) {
+    randDir(d); const h = terrainH(d);
+    if (h > -0.03 || h < -0.25 || Math.abs(d.y) > 0.9) continue;
+    addPerson(d.clone(), true);
+  }
+  [pTorso, pHead].forEach(m => finalize(m, people.length));
+  [pLeg, pArm].forEach(m => finalize(m, people.length * 2));
+}
+const _pb = new THREE.Matrix4(), _pl = new THREE.Matrix4(), _pt = new THREE.Matrix4(), _pr = new THREE.Matrix4(), _pn = new V3(), _pd = new V3(), _ps = new V3();
+function updatePeople(dt, time) {
+  for (const p of people) {
+    if (p.gone != null) { // fell in the volcano: stay hidden a moment, then turn up somewhere else
+      if (time - p.gone > 2.5) respawnPerson(p);
+      else { hidePerson(p); continue; }
+    }
+    const me = p === driven;
+    let go, turn;
+    if (p.manual) { go = me ? axis('f', 'b') : 0; turn = me ? axis('l', 'r') * 2.6 : 0; }
+    else { go = 1; turn = Math.sin(time * 0.4 + p.ph) * 0.8 + Math.sin(time * 1.3 + p.ph * 2) * 0.4; }
+    const maxV = p.manual ? (me && keys.boost ? 0.32 : 0.14) * (p.swim > 0.5 ? 0.6 : 1) : p.speed;
+    p.v = lerp(p.v, go * maxV, 1 - Math.exp(-dt * 6));
+    p.fwd.applyAxisAngle(p.up, turn * dt);
+    _pn.copy(p.up).addScaledVector(p.fwd, p.v * dt / R).normalize();
+    let h = terrainH(_pn);
+    let ok = !obstacleAt(_pn);
+    if (!p.manual) ok = ok && (p.swimmer ? h < -0.03 && h > -0.6 && Math.abs(_pn.y) < 0.91 : h > 0.01); // walkers stay ashore, swimmers stay in open water
+    if (ok) p.up.copy(_pn);
+    else { h = terrainH(p.up); p.v = 0; if (!p.manual) p.fwd.applyAxisAngle(p.up, Math.PI * (0.5 + rand())); }
+    // a car bumping into us shoves us out to its side
+    for (const c of cars) {
+      _pd.subVectors(p.pos, c.pos);
+      if (_pd.lengthSq() > 0.005 || Math.abs(_pd.dot(c.fwd)) > 0.05) continue;
+      _ps.crossVectors(c.fwd, c.up);
+      const lat = _pd.dot(_ps);
+      if (Math.abs(lat) < 0.03) { p.up.addScaledVector(_ps, ((lat >= 0 ? 1 : -1) * 0.032 - lat) / R).normalize(); p.v = 0; h = terrainH(p.up); }
+    }
+    p.fwd.addScaledVector(p.up, -p.fwd.dot(p.up)).normalize();
+    if (angle(p.up, VOLC.dir) < 0.026) { intoTheVolcano(p); hidePerson(p); continue; }
+    p.swim = lerp(p.swim, h < -0.02 ? 1 : 0, 1 - Math.exp(-dt * 5));
+    // stand exactly on whatever is underfoot: the terrain mesh, a road, or a car park
+    let land = groundR(p.up);
+    if (h >= 0 && onRoad(p.up, 0.0055)) land = Math.max(land, radiusOf(h) + 0.011);
+    else if (h >= 0 && lots.some(l => angle(l.c, p.up) < l.radius * 0.9)) land = Math.max(land, radiusOf(h) + 0.006);
+    if (h < 0) land = Math.max(land, R - 0.031);
+    p.pos.copy(p.up).multiplyScalar(lerp(land, R - 0.031 + Math.sin(time * 3 + p.ph) * 0.003, p.swim));
+    p.phase += Math.abs(p.v) * dt * 95;
+    const swing = Math.sin(p.phase) * Math.min(1, Math.abs(p.v) * 15) * 0.7;
+    // body: lean forward into a swimming pose in the water
+    _pb.copy(frameMatrix(p.pos, p.up, p.fwd)).multiply(_pt.makeTranslation(0, 0.031, 0)).multiply(_pr.makeRotationX(p.swim * 1.35)).multiply(_pt.makeTranslation(0, -0.031, 0));
+    pTorso.setMatrixAt(p.i, _pb); pHead.setMatrixAt(p.i, _pb);
+    for (const side of [-1, 1]) {
+      const k = p.i * 2 + (side > 0 ? 1 : 0);
+      const legA = lerp(swing * side, Math.sin(time * 12 + side * 1.5) * 0.4, p.swim);
+      pLeg.setMatrixAt(k, _pl.copy(_pb).multiply(_pt.makeTranslation(side * 0.0042, 0.02, 0)).multiply(_pr.makeRotationX(legA)));
+      const armA = p.swim > 0.5 ? time * 7 + (side > 0 ? Math.PI : 0) : -swing * side * 0.8;
+      pArm.setMatrixAt(k, _pl.copy(_pb).multiply(_pt.makeTranslation(side * 0.0115, 0.041, 0)).multiply(_pr.makeRotationX(armA)));
+    }
+  }
+  [pTorso, pHead, pLeg, pArm].forEach(m => m.instanceMatrix.needsUpdate = true);
+}
+
+function hidePerson(p) {
+  pTorso.setMatrixAt(p.i, _zero); pHead.setMatrixAt(p.i, _zero);
+  for (const k of [0, 1]) { pLeg.setMatrixAt(p.i * 2 + k, _zero); pArm.setMatrixAt(p.i * 2 + k, _zero); }
+}
+function intoTheVolcano(p) {
+  p.gone = time;
+  for (let i = 0; i < 10; i++) spawnPuff(_vp.copy(p.pos).add(_vv.set(rr(-0.03, 0.03), rr(-0.03, 0.03), rr(-0.03, 0.03))), rr(0.03, 0.07), 2, 1.5, _vd.copy(p.up).multiplyScalar(rr(0.1, 0.3)), false, rand() < 0.5 ? '#ff7b1c' : '#4a4458');
+  for (let i = 0; i < 5; i++) { // the volcano burps
+    const b = bombs[bombHead]; bombHead = (bombHead + 1) % bombs.length;
+    b.alive = true; b.pos.copy(VOLC_TOP);
+    b.vel.copy(VOLC.dir).multiplyScalar(rr(0.6, 1)).addScaledVector(VOLC.t1, rr(-0.3, 0.3)).addScaledVector(VOLC.t2, rr(-0.3, 0.3));
+  }
+  const wasMe = p === driven, watched = mode === 'person' && targets.person().o === p;
+  p.manual = false; p.v = 0;
+  if (wasMe || watched) { // you become somebody else
+    const others = people.filter(q => q !== p && q.gone == null && !q.swimmer);
+    const q = pick(others);
+    followIdx = people.indexOf(q);
+    driven = null;
+    if (wasMe) takeControl(q);
+    hint.textContent = 'Into the volcano! Poof… now you are somebody else';
+  }
+}
+function respawnPerson(p) {
+  const d = new V3();
+  for (let t = 0; t < 200; t++) {
+    const c = pick(cities);
+    d.copy(offsetDir(c.dir, Math.sqrt(rand()) * (c.r + 0.2), rand() * TAU));
+    if (terrainH(d) >= 0.02 && !obstacleAt(d)) break;
+  }
+  p.up.copy(d); p.fwd.copy(basisOf(d)[0]); p.gone = null; p.swim = 0; p.v = 0; p.swimmer = false;
+  p.pos.copy(d).multiplyScalar(groundR(d));
+}
+
+// ---------- volcano: puffs smoke, erupts lava bombs every so often ----------
+const VOLC_TOP = VOLC.dir.clone().multiplyScalar(radiusOf(terrainH(VOLC.dir)) + 0.02);
+const BOMBS = 260, bombs = [], bombMesh = makeInstanced(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshBasicMaterial({ color: '#ff7b1c' }), BOMBS, 1.5, 4);
+for (let i = 0; i < 90; i++) bombs.push({ pos: new V3(), vel: new V3(), alive: false, s: rr(0.018, 0.04) });
+for (let i = 90; i < BOMBS; i++) bombs.push({ pos: new V3(), vel: new V3(), alive: false, s: 0.018 + Math.random() * 0.022 });
+finalize(bombMesh, BOMBS);
+// ground-level viewpoint for the 🌋 camera: the side of the volcano with the clearest line of sight
+const VOLC_VIEW_ANG = 0.31; // how far from the crater the camera stands (radians; about 3.1 units)
+const VOLC_CAM_DIST = 4.2, VOLC_CAM_ELEV = 0.45; // default eruption view: 4.2 units out, about 25° above the horizon
+const volcViewDir = (az, ang, out) => out.copy(VOLC.dir).multiplyScalar(Math.cos(ang))
+  .addScaledVector(VOLC.t1, Math.sin(ang) * Math.cos(az)).addScaledVector(VOLC.t2, Math.sin(ang) * Math.sin(az)).normalize();
+{
+  let best = Infinity; const q = new V3();
+  for (let i = 0; i < 24; i++) {
+    const az = i / 24 * TAU;
+    let worst = 0; // tallest ground between the camera spot and the volcano's flank, relative to the camera spot
+    const camR = radiusOf(terrainH(volcViewDir(az, VOLC_VIEW_ANG, q)));
+    for (let k = 0; k <= 6; k++) worst = Math.max(worst, radiusOf(terrainH(volcViewDir(az, lerp(0.13, VOLC_VIEW_ANG, k / 6), q))) - camR);
+    if (worst < best) { best = worst; VOLC.viewAz = az; }
+  }
+}
+
+// the 🌋 button: a big eruption lasting BIG_T seconds
+const BIG_T = 9;
+let bigEruption = 0;
+const _vt = new V3();
+const volcanoEvents = { launches: 0, landings: 0, boom: 0 };
+function triggerEruption() {
+  volcanoEvents.boom++;
+  bigEruption = BIG_T;
+  // opening blast: a ring of ash rolling out across the slopes
+  for (let i = 0; i < 28; i++) {
+    const a = i / 28 * TAU;
+    _vt.copy(VOLC.t1).multiplyScalar(Math.cos(a)).addScaledVector(VOLC.t2, Math.sin(a));
+    spawnPuff(_vp.copy(VOLC_TOP).addScaledVector(_vt, 0.05), rr(0.07, 0.12), 2.6, 1.2, _vv.copy(_vt).multiplyScalar(rr(0.45, 0.6)).addScaledVector(VOLC.dir, 0.08), false, i % 2 ? '#6b6478' : '#8f88a0');
+  }
+  for (let i = 0; i < 25; i++) launchBomb(true);
+}
+function launchBomb(big) {
+  const b = bombs[bombHead]; bombHead = (bombHead + 1) % bombs.length;
+  b.alive = true; b.pos.copy(VOLC_TOP);
+  const up = big ? rr(1.0, 2.0) : rr(0.7, 1.2), side = big ? 0.85 : 0.4;
+  b.vel.copy(VOLC.dir).multiplyScalar(up).addScaledVector(VOLC.t1, rr(-side, side)).addScaledVector(VOLC.t2, rr(-side, side));
+  b.big = big;
+  volcanoEvents.launches++;
+}
+let bombHead = 0, bombEmit = 0, smokeEmit = 0;
+const _vp = new V3(), _vv = new V3(), _vd = new V3();
+function updateVolcano(dt, time) {
+  const big = bigEruption > 0;
+  if (big) bigEruption = Math.max(0, bigEruption - dt);
+  const erupting = big || time % 16 < 4.5;
+  smokeEmit -= dt;
+  if (big && smokeEmit <= 0) {
+    // a towering column of dark ash, glowing orange at the base
+    smokeEmit = 0.018;
+    _vp.copy(VOLC_TOP).addScaledVector(VOLC.t1, rr(-0.06, 0.06)).addScaledVector(VOLC.t2, rr(-0.06, 0.06));
+    _vv.copy(VOLC.dir).multiplyScalar(rr(0.5, 0.9)).addScaledVector(VOLC.t1, rr(-0.08, 0.08)).addScaledVector(VOLC.t2, rr(-0.08, 0.08));
+    const glow = rand() < 0.2;
+    spawnPuff(_vp, glow ? rr(0.06, 0.1) : rr(0.1, 0.22), glow ? 1.2 : rr(5, 8), glow ? 0.8 : 1.6, _vv, false, glow ? '#ff7b1c' : pick(['#3b3552', '#4a4458', '#5c5470', '#8f88a0']));
+  } else if (smokeEmit <= 0) {
+    smokeEmit = erupting ? 0.06 : 0.35;
+    _vp.copy(VOLC_TOP).addScaledVector(VOLC.t1, rr(-0.05, 0.05)).addScaledVector(VOLC.t2, rr(-0.05, 0.05));
+    _vv.copy(VOLC.dir).multiplyScalar(rr(0.2, 0.35)).addScaledVector(VOLC.t1, rr(-0.05, 0.05)).addScaledVector(VOLC.t2, rr(-0.05, 0.05));
+    spawnPuff(_vp, rr(0.05, erupting ? 0.12 : 0.08), rr(3, 5), 1.2, _vv, false, erupting && rand() < 0.35 ? '#4a4458' : '#8f88a0');
+  }
+  if (erupting) {
+    bombEmit -= dt;
+    if (bombEmit <= 0) {
+      bombEmit = big ? 0.015 : 0.05;
+      launchBomb(big);
+    }
+  }
+  let flying = 0; // only bombs in the air are drawn
+  bombs.forEach(b => {
+    if (!b.alive) return;
+    b.vel.addScaledVector(_vd.copy(b.pos).normalize(), -0.9 * dt); // gravity
+    b.pos.addScaledVector(b.vel, dt);
+    if (b.pos.length() < surfaceR(_vd.copy(b.pos).normalize())) {
+      b.alive = false;
+      spawnPuff(b.pos, b.big ? 0.06 : 0.03, b.big ? 1.8 : 1.2, 1, null, false, '#6b6478');
+      volcanoEvents.landings++;
+      return;
+    }
+    const sz = b.s * (b.big ? 1.5 : 1);
+    bombMesh.setMatrixAt(flying++, _pm.makeScale(sz, sz, sz).setPosition(b.pos));
+  });
+  bombMesh.count = flying; bombMesh.children.forEach(c => c.count = flying);
+  bombMesh.instanceMatrix.needsUpdate = true;
+}
+
+// ---------- rocket: pad -> countdown -> moon -> back home, on a loop ----------
+const COUNT = 8, FLIGHT = 20, STAY = 8;
+const rocket = { state: 'pad', timer: 0, pos: new V3(), fwd: new V3(), up: basisOf(PAD.dir)[0], emit: 0 };
+{
+  const white = comicMat('#f7f3e3'), red = comicMat('#ff5d73'), dark = comicMat('#3b3552');
+  const add = (geo, mat, parent, ol = true) => { const m = new THREE.Mesh(geo, mat); if (ol) outline(m, 2.5, 5); parent.add(m); return m; };
+  // rocket, built along +Z (nose) with its centre at the origin
+  const g = new THREE.Group();
+  add(new THREE.CylinderGeometry(0.1, 0.1, 0.5, 18).rotateX(Math.PI / 2), white, g);
+  add(new THREE.ConeGeometry(0.1, 0.24, 18).rotateX(Math.PI / 2).translate(0, 0, 0.37), red, g);
+  add(new THREE.CylinderGeometry(0.103, 0.103, 0.06, 18).rotateX(Math.PI / 2).translate(0, 0, -0.1), red, g, false);
+  add(new THREE.SphereGeometry(0.045, 14, 10).scale(1, 0.45, 1).translate(0, 0.095, 0.1), comicMat('#6fd3ff'), g);
+  for (let i = 0; i < 3; i++) {
+    const piv = new THREE.Group(); piv.rotation.z = Math.PI + i * TAU / 3;
+    add(new THREE.BoxGeometry(0.014, 0.11, 0.15).translate(0, 0.14, -0.22), red, piv); g.add(piv);
+  }
+  add(new THREE.CylinderGeometry(0.05, 0.075, 0.07, 14).rotateX(Math.PI / 2).translate(0, 0, -0.28), dark, g);
+  const flame = new THREE.Group(); flame.position.z = -0.315;
+  const fo = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.4, 14).rotateX(-Math.PI / 2).translate(0, 0, -0.2), flameMat);
+  const fi = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.25, 12).rotateX(-Math.PI / 2).translate(0, 0, -0.125), flameCore);
+  outline(fo, 2, 5); flame.add(fo, fi); g.add(flame);
+  world.add(g);
+  rocket.g = g; rocket.flame = flame;
+  // launch pad with a service tower
+  const pg = new THREE.Group();
+  pg.applyMatrix4(surfaceMatrix(PAD.dir, PAD.r - 0.02, 0, 1, 1, 1));
+  add(new THREE.CylinderGeometry(0.3, 0.34, 0.08, 28).translate(0, 0.04, 0), comicMat('#8d86a8'), pg);
+  add(new THREE.CylinderGeometry(0.2, 0.2, 0.012, 28).translate(0, 0.085, 0), comicMat('#ffd84d'), pg, false);
+  add(new THREE.BoxGeometry(0.07, 1.0, 0.07).translate(0.33, 0.5, 0), red, pg);
+  add(new THREE.BoxGeometry(0.2, 0.03, 0.03).translate(0.21, 0.72, 0), white, pg);
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffe14d' }));
+  beacon.position.set(0.33, 1.02, 0); pg.add(beacon);
+  world.add(pg);
+  obstacles.push({ d: PAD.dir.clone(), half: 0.04 }); // solid, but can't be knocked over
+}
+const _A = new V3(), _An = new V3(), _B = new V3(), _Bn = new V3(), _P1 = new V3(), _P2 = new V3(), _bp = new V3(), _bq = new V3();
+const _rq = new THREE.Quaternion(), _qi = new THREE.Quaternion(), _wInv = new THREE.Matrix4();
+// frames are in planet-local coordinates (the world group may be spinning)
+function padFrame(c, n) { n.copy(PAD.dir); c.copy(PAD.dir).multiplyScalar(PAD.r + 0.385); }
+function moonFrame(c, n) {
+  _wInv.copy(world.matrixWorld).invert();
+  n.copy(MOON_SITE_DIR).transformDirection(moon.matrixWorld).transformDirection(_wInv);
+  c.copy(MOON_SITE_DIR).multiplyScalar(moonRad(MOON_SITE_DIR) + 0.3).applyMatrix4(moon.matrixWorld).applyMatrix4(_wInv);
+}
+function flightPoint(s, out) {
+  const t = s * s * (3 - 2 * s), u = 1 - t;
+  out.copy(_A).multiplyScalar(u * u * u).addScaledVector(_P1, 3 * u * u * t).addScaledVector(_P2, 3 * u * t * t).addScaledVector(_B, t * t * t);
+  const floor = 12.5 * Math.min(smooth(0.04, 0.2, s), smooth(0.96, 0.8, s)); // never cut through the planet
+  if (out.length() < floor) out.setLength(floor);
+  return out;
+}
+function fly(fromFn, toFn, s) {
+  fromFn(_A, _An); toFn(_B, _Bn);
+  const d = _A.distanceTo(_B);
+  _P1.copy(_A).addScaledVector(_An, d * 0.45);
+  _P2.copy(_B).addScaledVector(_Bn, d * 0.3);
+  flightPoint(s, rocket.pos);
+  const tan = flightPoint(Math.min(s + 0.004, 1), _bq).sub(flightPoint(Math.max(s - 0.004, 0), _bp));
+  if (tan.lengthSq() > 1e-12) tan.normalize(); else tan.copy(_An);
+  // flip over near the end so it lands tail-first
+  _rq.setFromUnitVectors(tan, _Bn);
+  rocket.fwd.copy(tan).applyQuaternion(_qi.identity().slerp(_rq, smooth(0.72, 0.9, s)));
+}
+function setRocket(state, timer = 0) { rocket.state = state; rocket.timer = timer; }
+function launchWindow() {
+  _bp.copy(PAD.dir).applyQuaternion(world.quaternion);
+  return moonAt(moonAngle + MOON_W * (COUNT + FLIGHT), _bq).normalize().dot(_bp) > 0.7;
+}
+function updateRocket(dt, time) {
+  const r = rocket; r.timer += dt;
+  let flame = 0, label;
+  if (r.state === 'pad' || r.state === 'count') {
+    padFrame(r.pos, r.fwd);
+    if (r.state === 'pad') {
+      label = 'On the launch pad, waiting for the Moon to rise overhead · press W to launch now';
+      if (r.timer > 6 && launchWindow()) setRocket('count');
+    } else {
+      const left = COUNT - r.timer;
+      label = left > 0.4 ? `T-minus ${Math.ceil(left)}…` : 'Lift-off!';
+      if (left < 1.5) flame = 0.4 + (1.5 - left) * 0.4;
+      if (left <= 0) setRocket('ascent');
+    }
+  } else if (r.state === 'ascent' || r.state === 'return') {
+    const s = Math.min(r.timer / FLIGHT, 1), out = r.state === 'ascent';
+    out ? fly(padFrame, moonFrame, s) : fly(moonFrame, padFrame, s);
+    flame = s < 0.4 ? 1 : (s > 0.74 && s < 0.995 ? 0.75 : 0);
+    label = out
+      ? (s < 0.3 ? 'Lift-off! Climbing out of the atmosphere' : s < 0.72 ? 'Coasting to the Moon' : 'Flip and burn: landing on the Moon')
+      : (s < 0.3 ? 'Blasting off from the Moon' : s < 0.72 ? 'Coasting home' : 'Landing burn: touching down on the pad');
+    if (s >= 1) setRocket(out ? 'moon' : 'pad');
+  } else {
+    moonFrame(r.pos, r.fwd);
+    label = `On the Moon! Heading home in ${Math.max(1, Math.ceil(STAY - r.timer))}…`;
+    if (r.timer > STAY) setRocket('return');
+  }
+  // keep a stable sideways vector (parallel transport) so the ride camera doesn't spin
+  r.up.addScaledVector(r.fwd, -r.up.dot(r.fwd));
+  if (r.up.lengthSq() < 1e-8) r.up.copy(basisOf(r.fwd)[0]);
+  r.up.normalize();
+  frameMatrix(r.pos, r.up, r.fwd).decompose(r.g.position, r.g.quaternion, r.g.scale);
+  const f = flame ? flame * (1 + Math.sin(time * 50) * 0.15) : 0.001;
+  r.flame.scale.set(f, f, f * (1 + Math.sin(time * 33) * 0.2));
+  r.flameLevel = flame;
+  if (flame) {
+    r.emit -= dt;
+    if (r.emit <= 0) { r.emit = 0.035; spawnPuff(_bp.copy(r.pos).addScaledVector(r.fwd, -0.45 - rand() * 0.15), 0.08 * flame, 3, 1.3); }
+  }
+  if (mode === 'rocket' && hint.textContent !== label) hint.textContent = label;
+}
+
+// ---------- manual driving (WASD) ----------
+const keys = {};
+const KEYMAP = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r', ShiftLeft: 'boost', ShiftRight: 'boost', KeyQ: 'dive', KeyE: 'rise' };
+let driven = null; // the vehicle currently under keyboard control
+addEventListener('keydown', e => {
+  const k = KEYMAP[e.code]; if (!k) return;
+  keys[k] = true; e.preventDefault();
+  if (mode === 'rocket') { if (k === 'f' && rocket.state === 'pad') setRocket('count', COUNT - 3); }
+  else if (mode !== 'orbit' && mode !== 'volcano' && k !== 'boost') takeControl(targets[mode]().o);
+});
+addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) keys[k] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+const axis = (a, b) => (keys[a] ? 1 : 0) - (keys[b] ? 1 : 0);
+
+function takeControl(o) {
+  if (driven === o) return;
+  driven = o;
+  if (o.bay) { o.bay.occupied = null; o.bay = o.lot = null; } // taking over a car cancels any parking plans
+  o.path = null; o.parked = false;
+  if (!o.manual) {
+    o.manual = true;
+    o.v = mode === 'plane' ? o.speed * o.pos.length() : mode === 'car' ? o.speed : mode === 'balloon' ? 0.28 : mode === 'sub' ? 0.2 : mode === 'person' ? 0 : mode === 'train' ? o.v : mode === 'bird' ? 0.5 : mode === 'fish' ? 0.12 : 0.4;
+    if (mode === 'fish') o.depth = R - o.pos.length();
+    o.alt = o.pos.length();
+  }
+  hint.textContent = mode === 'plane'
+    ? 'Flying! A/D turn · W climb · S dive · Shift boost · drag to look around'
+    : mode === 'bird'
+    ? 'Flying! A/D turn · W climb · S dive · Shift speed up · drag to look around'
+    : mode === 'fish'
+    ? 'Swimming! W swim · A/D turn · Q dive · E rise (and leap at the surface) · Shift dash · drag to look around'
+    : mode === 'train'
+    ? 'All aboard! W faster · S slower (and reverse) · T toot toot · Shift full steam · drag to look around'
+    : mode === 'person'
+    ? 'Walking! W/S walk · A/D turn · Shift run · wade into the sea to swim · drag to look around'
+    : mode === 'sub'
+    ? 'Submarine! W/S throttle · A/D steer · Q dive · E surface · Shift boost · drag to look around'
+    : mode === 'balloon'
+    ? 'Ballooning! W fire the burner · S vent · A/D steer the drift · Shift tailwind · drag to look around'
+    : `Driving! W/S throttle · A/D steer · Shift boost · drag to look around`;
+}
+
+const CAR_DRIVE = { acc: 1.4, max: 1.1, turn: 2.4, lift: 0.012, ok: h => h >= 0, solid: true, cars: true };
+// subs can go anywhere with enough water to float; if the water ahead is shallower than we're deep, climb over the rise
+const SUB_DRIVE = { acc: 0.6, max: 0.6, turn: 1.4, lift: 0, ok: h => h < -0.06, vessel: (o, nd, out) => out.copy(nd).multiplyScalar(R - 0.035 - o.depth),
+  fits: (o, h) => Math.max(0, -h * SEA - 0.12) >= o.depth - 0.02 };
+const BOAT_DRIVE = { acc: 0.8, max: 0.9, turn: 1.3, lift: 0, ok: h => h < -0.05, vessel: (o, nd, out) => out.copy(nd).multiplyScalar(R) };
+const _nd = new V3(), _np2 = new V3();
+// move along the sphere surface; cars stay on land, boats stay at sea
+function driveSurface(o, dt, cfg) {
+  const me = o === driven;
+  const thr = me ? axis('f', 'b') : 0, steer = me ? axis('l', 'r') : 0;
+  const max = cfg.max * (me && keys.boost ? 1.8 : 1);
+  o.v += thr * cfg.acc * dt;
+  o.v *= Math.exp(-dt * (thr ? 0.4 : 1.6));
+  o.v = clamp(o.v, -max * 0.4, max);
+  if (steer) o.fwd.applyAxisAngle(o.up, steer * cfg.turn * dt * (o.v < -0.02 ? -1 : 1) * Math.max(0.4, Math.min(1, Math.abs(o.v) / 0.25)));
+  const r = o.pos.length();
+  _nd.copy(o.up).addScaledVector(o.fwd, o.v * dt / r).normalize();
+  const h = terrainH(_nd);
+  _np2.copy(_nd).multiplyScalar(cfg.lift ? radiusOf(h) + cfg.lift : R);
+  let ob = cfg.solid ? obstacleAt(_nd) : null;
+  if (ob && o.up.dot(ob.d) > ob.cosLim) ob = null; // already inside (it was lying down when we drove in): let us out
+  if (ob && cfg.cars) knock(ob, o.fwd); // crash! the building topples (and you bounce off)
+  const hit = ob || (cfg.cars && carBlocked(o, _np2, o.fwd)) || (cfg.vessel && vesselBlocked(o, cfg.vessel(o, _nd, _vp2), o.fwd));
+  const fits = !cfg.fits || cfg.fits(o, h);
+  o.climbing = cfg.ok(h) && !fits;
+  if (cfg.ok(h) && !hit && fits) {
+    o.up.copy(_nd);
+    o.pos.copy(_np2);
+  } else if (o.climbing) o.v *= 0.9; // nose up against the slope while we rise
+  else o.v *= -0.3; // bump off coastlines, walls and other cars
+  o.fwd.addScaledVector(o.up, -o.fwd.dot(o.up)).normalize();
+}
+// balloons drift with the wind: W burner (rise), S vent (sink), A/D nudge the drift direction
+function flyBalloon(b, dt) {
+  const me = b === driven;
+  const climb = me ? axis('f', 'b') : 0, steer = me ? axis('l', 'r') : 0;
+  b.v = lerp(b.v, me && keys.boost ? 0.75 : 0.28, 1 - Math.exp(-dt * 0.8));
+  b.fwd.applyAxisAngle(b.up, steer * 0.7 * dt);
+  b.up.addScaledVector(b.fwd, b.v * dt / b.alt).normalize();
+  b.fwd.addScaledVector(b.up, -b.fwd.dot(b.up)).normalize();
+  b.vz = lerp(b.vz || 0, climb * 0.7 - 0.03, 1 - Math.exp(-dt * 1.3)); // lazy buoyancy
+  b.alt = clamp(b.alt + b.vz * dt, surfaceR(b.up) + 0.32, 17);
+  b.burn = climb > 0;
+}
+function flyPlane(p, dt) {
+  const me = p === driven;
+  const steer = me ? axis('l', 'r') : 0, climb = me ? axis('f', 'b') : 0;
+  const target = me && keys.boost ? 2.8 : 1.4;
+  p.v = lerp(p.v, target, 1 - Math.exp(-dt * 1.2));
+  p.fwd.applyAxisAngle(p.up, steer * 1.1 * dt);
+  const floor = surfaceR(p.up) + 0.45;
+  p.alt = clamp(p.alt + climb * 1.6 * dt, floor, 24);
+  if (p.alt < floor + 0.02 && climb < 0) p.alt = floor;
+  p.up.addScaledVector(p.fwd, p.v * dt / p.alt).normalize();
+  p.fwd.addScaledVector(p.up, -p.fwd.dot(p.up)).normalize();
+  p.pos.copy(p.up).multiplyScalar(p.alt);
+  if (p.alt < 12) { const ob = obstacleAt(p.up); if (ob && ob.top && p.alt < ob.top + 0.03) knock(ob, p.fwd); }
+  p.bankS = lerp(p.bankS || 0, -steer * 0.6, 1 - Math.exp(-dt * 4));
+  p.pitchS = lerp(p.pitchS || 0, -climb * 0.35, 1 - Math.exp(-dt * 4));
+  return { bank: p.bankS, pitch: p.pitchS };
+}
+
+// ---------- equator railway: an elevated line that rides over hills and bridges the seas ----------
+// a solid beam following a polyline: top surface `lift` above the points, `depth` thick, 2*hw wide
+function beam(pts, hw, lift, depth) {
+  const pos = [], nor = [], idx = [], n = pts.length;
+  const TL = [], TR = [], BL = [], BR = [], UP = [], SD = [];
+  for (let i = 0; i < n; i++) {
+    const t = new V3().subVectors(pts[Math.min(i + 1, n - 1)], pts[Math.max(i - 1, 0)]), up = pts[i].clone().normalize();
+    const side = new V3().crossVectors(t, up).normalize(), top = pts[i].clone().addScaledVector(up, lift), bot = top.clone().addScaledVector(up, -depth);
+    TL.push(top.clone().addScaledVector(side, -hw)); TR.push(top.clone().addScaledVector(side, hw));
+    BL.push(bot.clone().addScaledVector(side, -hw)); BR.push(bot.clone().addScaledVector(side, hw));
+    UP.push(up); SD.push(side);
+  }
+  // each face is a strip from edge A to edge B; winding makes (B - A) x direction-of-travel face outwards
+  const strip = (A, B, normalOf) => {
+    const base = pos.length / 3;
+    for (let i = 0; i < n; i++) {
+      const nm = normalOf(i);
+      pos.push(A[i].x, A[i].y, A[i].z, B[i].x, B[i].y, B[i].z);
+      nor.push(nm.x, nm.y, nm.z, nm.x, nm.y, nm.z);
+    }
+    for (let i = 0; i < n - 1; i++) { const a = base + 2 * i; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  };
+  strip(TL, TR, i => UP[i]);                         // top
+  strip(BR, BL, i => UP[i].clone().negate());        // underside
+  strip(TR, BR, i => SD[i]);                         // right side
+  strip(BL, TL, i => SD[i].clone().negate());        // left side
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setIndex(idx);
+  return g;
+}
+const TRACK_N = 1100;
+const track = { pts: [], cum: [0], closed: true };
+{
+  const g = [], dirs = [];
+  for (let i = 0; i < TRACK_N; i++) {
+    const a = i / TRACK_N * TAU, d = new V3(Math.cos(a), 0, Math.sin(a));
+    dirs.push(d); g.push(radiusOf(terrainH(d)));
+  }
+  // clear the local high point, then smooth into gentle gradients (never dipping into the ground)
+  const W = 30;
+  let t = g.map((_, i) => { let m = 0; for (let k = -W; k <= W; k++) m = Math.max(m, g[(i + k + TRACK_N) % TRACK_N]); return m + 0.07; });
+  for (let pass = 0; pass < 8; pass++) {
+    const sm = t.map((_, i) => { let a = 0; for (let k = -10; k <= 10; k++) a += t[(i + k + TRACK_N) % TRACK_N]; return a / 21; });
+    t = sm.map((v, i) => Math.max(v, g[i] + 0.07));
+  }
+  dirs.forEach((d, i) => track.pts.push(d.clone().multiplyScalar(t[i])));
+  track.pts.push(track.pts[0].clone());
+  for (let i = 1; i < track.pts.length; i++) track.cum.push(track.cum[i - 1] + track.pts[i].distanceTo(track.pts[i - 1]));
+  track.len = track.cum[track.cum.length - 1];
+
+  // deck, rails, sleepers, pillars
+  const pts = track.pts, n = pts.length, rails = [[], []];
+  for (let i = 0; i < n; i++) {
+    const tn = new V3().subVectors(pts[Math.min(i + 1, n - 1)], pts[Math.max(i - 1, 0)]), up = pts[i].clone().normalize();
+    const side = new V3().crossVectors(tn, up).normalize();
+    rails[0].push(pts[i].clone().addScaledVector(side, 0.02)); rails[1].push(pts[i].clone().addScaledVector(side, -0.02));
+  }
+  // deck and rails are solid beams, so they look right from below and from the side, not just from above
+  world.add(outline(new THREE.Mesh(beam(pts, 0.048, -0.001, 0.03), comicMat('#6b5a7a')), 1.5, 3));
+  world.add(new THREE.Mesh(mergeGeometries(rails.map(r => beam(r, 0.0035, 0.011, 0.005))), comicMat('#e6e0f0')));
+  const nSl = Math.floor(track.len / 0.045), nPi = Math.floor(track.len / 0.28);
+  const sleepers = makeInstanced(new THREE.BoxGeometry(0.07, 0.006, 0.014), comicMat('#8a5a3b'), nSl);
+  const pillars = makeInstanced(new THREE.CylinderGeometry(0.012, 0.017, 1, 7).translate(0, 0.5, 0), comicMat('#b9b2c9'), nPi, 1.5, 3);
+  const p = new V3(), tg = new V3();
+  for (let i = 0; i < nSl; i++) {
+    Road.prototype.sample.call(track, i * 0.045, p, tg);
+    const up = p.clone().normalize();
+    sleepers.setMatrixAt(i, frameMatrix(p.clone().addScaledVector(up, 0.003), up, tg.addScaledVector(up, -tg.dot(up)).normalize()));
+  }
+  let np = 0;
+  for (let i = 0; i < nPi; i++) {
+    Road.prototype.sample.call(track, i * 0.28, p, tg);
+    const d = p.clone().normalize(), base = seabedR(terrainH(d)), gap = p.length() - base;
+    if (gap > 0.09) pillars.setMatrixAt(np++, surfaceMatrix(d, base - 0.02, 0, 1, gap + 0.02, 1));
+  }
+  finalize(sleepers, nSl); finalize(pillars, np);
+}
+const train = { s: 0, v: 0.6, pos: new V3(), fwd: new V3(0, 0, 1), up: new V3(0, 1, 0), units: [], offsets: [], emit: 0, toots: [], lastToot: -99, nextToot: 20 };
+{
+  const add = (g, geo, color, x, y, z, ol = true) => { const m = new THREE.Mesh(geo, typeof color === 'string' ? comicMat(color) : color); m.position.set(x, y, z); if (ol) outline(m, 2, 4); g.add(m); return m; };
+  const wheel = new THREE.CylinderGeometry(0.011, 0.011, 0.006, 12).rotateZ(Math.PI / 2);
+  // steam locomotive
+  const loco = new THREE.Group();
+  add(loco, new THREE.BoxGeometry(0.05, 0.012, 0.1), '#3b3552', 0, 0.018, 0);
+  add(loco, new THREE.CylinderGeometry(0.021, 0.021, 0.065, 16).rotateX(Math.PI / 2), '#ff5d73', 0, 0.044, 0.016);
+  add(loco, new THREE.BoxGeometry(0.052, 0.05, 0.036), '#3a86ff', 0, 0.049, -0.031);
+  add(loco, new THREE.BoxGeometry(0.058, 0.007, 0.044), '#3b3552', 0, 0.077, -0.031);
+  add(loco, new THREE.CylinderGeometry(0.008, 0.011, 0.03, 10), '#3b3552', 0, 0.075, 0.036);
+  add(loco, new THREE.CylinderGeometry(0.0045, 0.0045, 0.016, 8), '#ffd23f', 0, 0.072, 0.002); // brass whistle
+  add(loco, new THREE.BoxGeometry(0.046, 0.014, 0.01), '#ffd23f', 0, 0.014, 0.054);
+  for (const z of [0.03, 0, -0.03]) for (const x of [-1, 1]) add(loco, wheel, '#ffd23f', x * 0.027, 0.011, z, false);
+  train.units.push(loco); train.offsets.push(0);
+  // carriages
+  const colors = ['#06d6a0', '#ffd23f', '#b388ff', '#ff9f1c'];
+  colors.forEach((col, k) => {
+    const g = new THREE.Group();
+    add(g, new THREE.BoxGeometry(0.048, 0.04, 0.12), col, 0, 0.034, 0);
+    add(g, new THREE.BoxGeometry(0.0495, 0.012, 0.1), '#9fe7ff', 0, 0.041, 0, false);
+    add(g, new THREE.BoxGeometry(0.054, 0.006, 0.126), '#ffffff', 0, 0.057, 0);
+    for (const z of [0.04, -0.04]) for (const x of [-1, 1]) add(g, wheel, '#3b3552', x * 0.025, 0.011, z, false);
+    train.units.push(g); train.offsets.push(-(0.05 + 0.016 + 0.06 + k * 0.136));
+  });
+  train.units.forEach(u => world.add(u));
+}
+const _tp = new V3(), _tt = new V3(), _tu = new V3();
+// ---------- train whistle: two toots and two big bursts of steam ----------
+let audioCtx = null;
+const TOOTS = [[0, 0.32], [0.45, 0.6]]; // [start, length] in seconds: toot... toooot
+function playWhistle() {
+  if (!audioCtx) return;
+  const ac = audioCtx;
+  if (ac.state === 'suspended') ac.resume();
+  const t0 = ac.currentTime + 0.02;
+  const out = ac.createGain(); out.gain.value = 0.2; out.connect(sfx.master);
+  const noise = ac.createBuffer(1, Math.floor(ac.sampleRate * 1.2), ac.sampleRate), nd = noise.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  for (const [start, len] of TOOTS) {
+    const a = t0 + start, env = ac.createGain();
+    env.gain.setValueAtTime(0, a); env.gain.linearRampToValueAtTime(1, a + 0.04);
+    env.gain.setValueAtTime(1, a + len - 0.08); env.gain.linearRampToValueAtTime(0, a + len);
+    env.connect(out);
+    // a chime whistle is a chord; each note swoops up to pitch as the steam valve opens
+    for (const [f, g] of [[392, 0.5], [494, 0.38], [587, 0.32]]) {
+      const o = ac.createOscillator(), og = ac.createGain();
+      o.type = 'triangle'; o.frequency.setValueAtTime(f * 0.93, a); o.frequency.linearRampToValueAtTime(f, a + 0.07);
+      og.gain.value = g; o.connect(og).connect(env); o.start(a); o.stop(a + len + 0.05);
+    }
+    // and a breathy hiss of steam underneath
+    const src = ac.createBufferSource(), bp = ac.createBiquadFilter(), ng = ac.createGain();
+    src.buffer = noise; bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 0.7; ng.gain.value = 0.22;
+    src.connect(bp).connect(ng).connect(env); src.start(a); src.stop(a + len);
+  }
+}
+function toot(withSound = true) {
+  if (time - train.lastToot < 1.3) return;
+  train.lastToot = time;
+  train.toots = TOOTS.map(([start, len]) => [time + start, time + start + len]);
+  if (withSound) playWhistle();
+}
+// T (or Space): the train toots its whistle, a boat hoots its horn
+addEventListener('keydown', e => {
+  if ((mode !== 'train' && mode !== 'boat') || (e.code !== 'KeyT' && e.code !== 'Space') || e.repeat) return;
+  e.preventDefault();
+  sfxInit();
+  if (mode === 'train') toot(); else hoot(targets.boat().o);
+});
+const _ts = new V3();
+function updateTrain(dt, time) {
+  if (train.manual) {
+    const me = train === driven, thr = me ? axis('f', 'b') : 0;
+    train.v = clamp(train.v + thr * 0.6 * dt, -0.4, me && keys.boost ? 2.2 : 1.4);
+  }
+  train.s = ((train.s + train.v * dt) % track.len + track.len) % track.len;
+  train.units.forEach((u, k) => {
+    const s = ((train.s + train.offsets[k]) % track.len + track.len) % track.len;
+    Road.prototype.sample.call(track, s, _tp, _tt);
+    _tu.copy(_tp).normalize();
+    _tt.addScaledVector(_tu, -_tt.dot(_tu)).normalize();
+    _tp.addScaledVector(_tu, 0.009); // sit on the rails
+    frameMatrix(_tp, _tu, _tt).decompose(u.position, u.quaternion, u.scale);
+    if (k === 0) { train.pos.copy(_tp); train.fwd.copy(_tt); train.up.copy(_tu); }
+  });
+  // autopilot toots every so often; you only hear it when you're close (and sound has been switched on)
+  if (time > train.nextToot) {
+    train.nextToot = time + rr(25, 50);
+    const near = camera.position.distanceTo(_ts.copy(train.pos).applyQuaternion(world.quaternion)) < 5;
+    toot(near || mode === 'train');
+  }
+  // whistle steam: big white bursts shooting up while each toot sounds
+  if (train.toots.some(([a, b]) => time >= a && time <= b)) {
+    train.whistleEmit = (train.whistleEmit || 0) - dt;
+    if (train.whistleEmit <= 0) {
+      train.whistleEmit = 0.02;
+      _ts.copy(train.pos).addScaledVector(train.up, 0.085).addScaledVector(train.fwd, 0.002);
+      spawnPuff(_ts, rr(0.018, 0.032), rr(1, 1.6), 2.4, _tt.copy(train.up).multiplyScalar(rr(0.35, 0.6)).addScaledVector(train.fwd, rr(-0.08, 0.08)));
+    }
+  }
+  train.emit -= dt;
+  if (Math.abs(train.v) > 0.05 && train.emit <= 0) {
+    train.emit = 0.14 / Math.min(2, Math.abs(train.v) + 0.4);
+    spawnPuff(_pm2.copy(train.pos).addScaledVector(train.up, 0.095).addScaledVector(train.fwd, 0.036), rr(0.014, 0.022), 1.8, 1.6, _tt.copy(train.up).multiplyScalar(0.12));
+  }
+}
+
+// ---------- sound: gentle procedural effects for whatever you're riding or following ----------
+// Everything is synthesised with Web Audio (no sound files): three continuous layers (low rumble/hiss,
+// band-passed noise for water/wind/burner, and an engine), plus short one-off sounds (chuffs, steps,
+// chirps, bubbles, beeps...). Browsers only allow sound after a click or key press, so it starts then.
+const sfx = { master: null, muted: false, next: {}, last: {}, mode: null };
+try { sfx.muted = localStorage.getItem('planetpop-muted') === '1'; } catch { /* storage blocked: default to sound on */ }
+function sfxInit() {
+  if (audioCtx) { if (audioCtx.state === 'suspended' && !sfx.muted) audioCtx.resume(); return; }
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
+  const ac = audioCtx;
+  sfx.master = ac.createGain(); sfx.master.gain.value = sfx.muted ? 0 : 0.8; sfx.master.connect(ac.destination);
+  const buf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  sfx.noise = buf;
+  const loopNoise = () => { const src = ac.createBufferSource(); src.buffer = buf; src.loop = true; src.start(); return src; };
+  const layer = type => { const f = ac.createBiquadFilter(), g = ac.createGain(); f.type = type; g.gain.value = 0; f.connect(g).connect(sfx.master); return { f, g }; };
+  sfx.low = layer('lowpass'); loopNoise().connect(sfx.low.f);   // rumble, hiss, underwater, rocket roar
+  sfx.band = layer('bandpass'); loopNoise().connect(sfx.band.f); // waves, wind, balloon burner
+  sfx.volc = layer('lowpass'); loopNoise().connect(sfx.volc.f);  // the volcano's roar, heard whenever you're near it
+  sfx.eng = layer('lowpass');                                     // engines: two detuned saws with a tremolo
+  const am = ac.createGain(); am.connect(sfx.eng.f);
+  sfx.engA = ac.createOscillator(); sfx.engB = ac.createOscillator();
+  sfx.engA.type = sfx.engB.type = 'sawtooth'; sfx.engB.detune.value = 14;
+  sfx.engA.connect(am); sfx.engB.connect(am); sfx.engA.start(); sfx.engB.start();
+  sfx.lfo = ac.createOscillator(); sfx.lfoDepth = ac.createGain(); sfx.lfoDepth.gain.value = 0;
+  sfx.lfo.connect(sfx.lfoDepth).connect(am.gain); sfx.lfo.start(); // flutter / putt-putt / cylinder beat
+}
+addEventListener('pointerdown', sfxInit);
+addEventListener('keydown', sfxInit);
+// one-off sounds
+function sfxBurst({ at = audioCtx.currentTime, dur = 0.1, type = 'bandpass', freq = 800, q = 1, gain = 0.1, attack = 0.01 }) {
+  const ac = audioCtx, src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  src.buffer = sfx.noise; f.type = type; f.frequency.value = freq; f.Q.value = q;
+  g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(gain, at + attack); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  src.connect(f).connect(g).connect(sfx.master); src.start(at, Math.random()); src.stop(at + dur + 0.05);
+}
+function sfxBlip({ at = audioCtx.currentTime, f0, f1 = f0, dur = 0.08, gain = 0.05, type = 'sine' }) {
+  const ac = audioCtx, o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, at); o.frequency.exponentialRampToValueAtTime(f1, at + dur);
+  g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(gain, at + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  o.connect(g).connect(sfx.master); o.start(at); o.stop(at + dur + 0.02);
+}
+function hum(at) { // a little hummed tune: a wandering phrase on a pentatonic scale, soft and wobbly
+  const ac = audioCtx, scale = [196, 220, 247, 294, 330, 392], f = ac.createBiquadFilter(), g = ac.createGain();
+  f.type = 'lowpass'; f.frequency.value = 1000; g.gain.value = 0.05; f.connect(g).connect(sfx.master);
+  let k = Math.floor(Math.random() * 3) + 1, t = at;
+  for (let n = 0, count = 4 + Math.floor(Math.random() * 4); n < count; n++) {
+    k = clamp(k + Math.floor(Math.random() * 3) - 1, 0, scale.length - 1);
+    const len = rr(0.22, 0.42), o = ac.createOscillator(), e = ac.createGain(), vib = ac.createOscillator(), vg = ac.createGain();
+    o.type = 'triangle'; o.frequency.value = scale[k];
+    vib.frequency.value = 5; vg.gain.value = scale[k] * 0.006; vib.connect(vg).connect(o.frequency);
+    e.gain.setValueAtTime(0, t); e.gain.linearRampToValueAtTime(1, t + 0.05); e.gain.setValueAtTime(1, t + len - 0.06); e.gain.linearRampToValueAtTime(0, t + len);
+    o.connect(e).connect(f); o.start(t); o.stop(t + len + 0.02); vib.start(t); vib.stop(t + len + 0.02);
+    t += len + rr(0, 0.06);
+  }
+}
+function hoot(b) { // a boat's horn, with a puff from its funnel
+  if (!b) return;
+  if (audioCtx && sfx.master) {
+    const ac = audioCtx, at = ac.currentTime + 0.02, f = ac.createBiquadFilter(), g = ac.createGain();
+    f.type = 'lowpass'; f.frequency.value = 650; f.connect(g).connect(sfx.master);
+    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(0.09, at + 0.08); g.gain.setValueAtTime(0.09, at + 0.95); g.gain.linearRampToValueAtTime(0, at + 1.15);
+    for (const fr of [110, 139]) { const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = fr; o.connect(f); o.start(at); o.stop(at + 1.2); }
+  }
+  for (let i = 0; i < 8; i++) spawnPuff(_pm2.copy(b.pos).addScaledVector(b.up, 0.095).addScaledVector(b.fwd, -0.03), rr(0.012, 0.02), 1.4, 1.8, _t.copy(b.up).multiplyScalar(rr(0.2, 0.35)));
+}
+// once every `gap` seconds of audio time (the first time after one gap)
+const sfxDue = (key, gap, now) => { sfx.next[key] ??= now + gap; if (now < sfx.next[key]) return false; sfx.next[key] = now + gap; return true; };
+function updateSound() {
+  if (!audioCtx || !sfx.master) return;
+  const now = audioCtx.currentTime;
+  if (sfx.mode !== mode) { // new mode: forget per-ride timers, but keep track of the volcano (so 🌋's boom isn't lost)
+    const v = volcanoEvents, l = sfx.last;
+    sfx.mode = mode; sfx.next = {};
+    sfx.last = { boom: l.boom ?? v.boom, launches: l.launches ?? v.launches, landings: l.landings ?? v.landings, erupting: l.erupting };
+  }
+  // targets for the continuous layers: low [gain, cutoff], band [gain, centre, Q], engine [gain, pitch, cutoff, tremolo rate, tremolo depth]
+  let low = [0, 400], band = [0, 600, 1], eng = [0, 60, 400, 8, 0];
+  const o = targets[mode] ? targets[mode]().o : null;
+  const waves = (strength) => { const swell = 0.5 + 0.5 * Math.sin(time * 0.8 + 1.3 * Math.sin(time * 0.31)); band = [(0.03 + swell * 0.05) * strength, 400 + swell * 200, 0.5]; };
+  const bubbles = (rate, gain) => { if (sfxDue('bubble', rr(0.4, 1.6) / rate, now)) sfxBlip({ f0: rr(320, 650), f1: rr(1000, 1900), dur: rr(0.05, 0.09), gain }); };
+  switch (mode) {
+    case 'train': { // soft rhythmic chuffs that quicken with speed, over a low rumble
+      const sp = Math.abs(train.v);
+      low = [0.035 + sp * 0.05, 160];
+      if (sp > 0.03 && sfxDue('chuff', 1 / (1.1 + sp * 4.5), now)) { sfx.accent = !sfx.accent; sfxBurst({ dur: 0.16, freq: 700, q: 0.9, gain: sfx.accent ? 0.2 : 0.13, attack: 0.012 }); }
+      break;
+    }
+    case 'car': { // engine note rises with speed and throttle; off when parked
+      const moving = o.manual || !o.parked || o.path;
+      if (moving) {
+        const sp = o.manual ? Math.abs(o.v) : o.path ? 0.15 : o.cur, thr = o === driven ? Math.abs(axis('f', 'b')) : 0;
+        eng = [0.05 + sp * 0.05 + thr * 0.02, 36 + sp * 95 + thr * 14, 260 + sp * 600 + thr * 200, 14 + sp * 40, 0.18];
+        low = [sp * 0.035, 500]; // tyres on the road
+      }
+      break;
+    }
+    case 'plane': { // propeller drone with a flutter, rising with speed
+      const sp = o.manual ? o.v : o.speed * o.alt;
+      eng = [0.065, 62 + sp * 18, 850, 20 + sp * 6, 0.35]; low = [0.022, 1000];
+      break;
+    }
+    case 'balloon': // burner roars when going up; otherwise a soft breeze
+      if (o.burn) { band = [0.2, 520, 0.6]; low = [0.05, 220]; } else band = [0.016, 900, 0.5];
+      break;
+    case 'boat': { // waves and a putt-putt engine; hoots now and then
+      const sp = o.manual ? Math.abs(o.v) : 0.4;
+      waves(1 + sp * 0.5); eng = [0.035 + sp * 0.04, 50, 320, 6 + sp * 6, 0.7];
+      if (!o.manual && sfxDue('hoot', rr(30, 60), now)) hoot(o);
+      break;
+    }
+    case 'sub': { // muffled underwater hum, motor and bubbles; waves when surfaced
+      const sp = o.manual ? Math.abs(o.v) : 0.25;
+      if (o.depth > 0.05) { low = [0.07, 240]; eng = [0.028 + sp * 0.04, 42 + sp * 25, 220, 3, 0.1]; bubbles(1.2 + sp * 6, 0.05); }
+      else { waves(0.7); eng = [0.03, 48, 260, 5, 0.3]; }
+      break;
+    }
+    case 'fish': { // underwater, bubbles, a soft swish as the tail sweeps, and a cartoon "blub blub" now and then
+      low = [0.055, 210]; bubbles(0.9, 0.045);
+      if (sfxDue('blub', rr(3, 7), now)) {
+        for (let i = 0, n = 2 + Math.floor(Math.random() * 2); i < n; i++)
+          sfxBlip({ at: now + i * rr(0.13, 0.18), f0: rr(520, 720), f1: rr(210, 290), dur: rr(0.1, 0.14), gain: 0.07 });
+      }
+      const j = (time - o.jump) / 1.1; // leaping out of the water: a splash on the way out, a plop on the way back in
+      if (j >= 0 && j < 0.2 && sfx.last.leap !== o.jump) { sfx.last.leap = o.jump; sfxBurst({ dur: 0.35, freq: 1400, q: 0.6, gain: 0.09, attack: 0.02 }); }
+      if (j >= 0.85 && j < 1.05 && sfx.last.plop !== o.jump) {
+        sfx.last.plop = o.jump;
+        sfxBurst({ dur: 0.3, freq: 1100, q: 0.6, gain: 0.08, attack: 0.01 });
+        sfxBlip({ f0: 950, f1: 280, dur: 0.12, gain: 0.07 });
+      }
+      const sweep = Math.floor((o.wig || 0) / Math.PI);
+      if (o.manual && o.v > 0.05 && sweep !== sfx.last.swish) { sfx.last.swish = sweep; sfxBurst({ dur: 0.14, freq: 500, q: 0.8, gain: 0.015 + o.v * 0.05, attack: 0.04 }); }
+      break;
+    }
+    case 'bird': { // wind, a soft whump each wingbeat, and a little chirp every few seconds
+      const sp = o.manual ? o.v : 0.4;
+      low = [0.012 + sp * 0.025, 650];
+      const beat = Math.floor((o.flapPh || 0) / TAU);
+      if (beat !== sfx.last.flap) { sfx.last.flap = beat; sfxBurst({ dur: 0.07, type: 'lowpass', freq: 1400, gain: 0.045, attack: 0.005 }); }
+      if (sfxDue('tweet', rr(2.5, 6), now)) {
+        const base = rr(2300, 3400);
+        for (let i = 0, n = 2 + Math.floor(Math.random() * 4); i < n; i++)
+          sfxBlip({ at: now + i * rr(0.08, 0.13), f0: base * rr(0.9, 1.1), f1: base * rr(1.15, 1.4), dur: rr(0.04, 0.07), gain: 0.03 });
+      }
+      break;
+    }
+    case 'person': { // footsteps in time with the stride, splashes when swimming, and the odd hummed tune
+      const moving = Math.abs(o.v) > 0.01;
+      if (o.swim > 0.5) {
+        band = [0.025, 700, 0.6];
+        const stroke = Math.floor(time * 7 / Math.PI);
+        if (moving && stroke !== sfx.last.stroke) { sfx.last.stroke = stroke; sfxBurst({ dur: 0.2, freq: 1500, q: 0.7, gain: 0.035, attack: 0.03 }); }
+      } else {
+        const step = Math.floor(o.phase / Math.PI);
+        if (moving && step !== sfx.last.step) { sfx.last.step = step; sfxBurst({ dur: 0.07, type: 'lowpass', freq: 420, gain: 0.09, attack: 0.004 }); }
+        if (moving && sfxDue('hum', rr(7, 15), now)) hum(now + 0.05);
+      }
+      break;
+    }
+    case 'rocket': { // countdown beeps; a roar while the engine burns; silence while coasting through space
+      const fl = rocket.flameLevel || 0;
+      if (fl > 0) { low = [0.05 + fl * 0.2, 300 + fl * 500]; eng = [fl * 0.05, 38, 180, 9, 0.3]; }
+      if (rocket.state === 'count') {
+        const n = Math.ceil(COUNT - rocket.timer);
+        if (n >= 1 && n <= COUNT && n !== sfx.last.beep) { sfx.last.beep = n; sfxBlip({ f0: n === 1 ? 1320 : 880, dur: 0.1, gain: 0.05 }); }
+      }
+      break;
+    }
+  }
+  // the volcano, in any mode: louder the closer you are (heard up to about 15 units away)
+  const vd = camera.position.distanceTo(_vt.copy(VOLC_TOP).applyQuaternion(world.quaternion));
+  const near = clamp(1 - (vd - 3) / 12, 0, 1), big = bigEruption > 0, erupting = big || time % 16 < 4.5;
+  const power = big ? Math.min(1, bigEruption / 2) : erupting ? 0.4 : 0.08; // a quiet grumble between eruptions
+  const vol = near * power;
+  const ev = volcanoEvents;
+  if (ev.boom !== sfx.last.boom || (erupting && !big && !sfx.last.erupting && near > 0)) { // KABOOM
+    const loud = ev.boom !== sfx.last.boom ? 1 : 0.4 * near;
+    sfx.last.boom = ev.boom;
+    if (loud > 0.02) {
+      sfxBurst({ dur: 0.5, freq: 700, q: 0.5, gain: 0.35 * loud, attack: 0.005 });                // the crack
+      sfxBurst({ dur: 1.8, type: 'lowpass', freq: 500, gain: 0.4 * loud, attack: 0.01 });        // the blast
+      sfxBlip({ f0: 140, f1: 38, dur: 1.4, gain: 0.35 * loud, type: 'triangle' });                // the thump in your chest
+    }
+  }
+  sfx.last.erupting = erupting;
+  if (vol > 0.02) {
+    if (erupting && sfxDue('crackle', rr(0.04, 0.12) / power, now)) // crackling rock and lava
+      sfxBurst({ dur: rr(0.02, 0.05), type: 'highpass', freq: rr(2500, 5000), gain: 0.05 * vol, attack: 0.002 });
+    if (ev.launches !== sfx.last.launches) { // a fwoomp as lava bombs are thrown out (at most a few a second)
+      if (sfxDue('fwoomp', 0.12, now)) sfxBlip({ f0: rr(160, 220), f1: rr(55, 75), dur: 0.28, gain: 0.08 * vol, type: 'triangle' });
+      sfx.last.launches = ev.launches;
+    }
+    if (ev.landings !== sfx.last.landings) { // and a thud where they land
+      if (sfxDue('thud', 0.15, now)) sfxBurst({ dur: 0.22, type: 'lowpass', freq: 350, gain: 0.08 * vol, attack: 0.005 });
+      sfx.last.landings = ev.landings;
+    }
+  } else { sfx.last.launches = ev.launches; sfx.last.landings = ev.landings; }
+  const tc = 0.12, set = (param, v) => param.setTargetAtTime(v, now, tc);
+  set(sfx.low.g.gain, low[0]); set(sfx.low.f.frequency, low[1]);
+  set(sfx.band.g.gain, band[0]); set(sfx.band.f.frequency, band[1]); set(sfx.band.f.Q, band[2]);
+  set(sfx.eng.g.gain, eng[0]); set(sfx.engA.frequency, eng[1]); set(sfx.engB.frequency, eng[1]); set(sfx.eng.f.frequency, eng[2]);
+  set(sfx.lfo.frequency, eng[3]); set(sfx.lfoDepth.gain, eng[4]);
+  set(sfx.volc.g.gain, 0.3 * vol); set(sfx.volc.f.frequency, 250 + power * 450); // the roar: audible on laptop speakers, not just a sub-bass rumble
+}
+
+// ---------- icebergs around the polar ice ----------
+{
+  const bergs = makeInstanced(new THREE.IcosahedronGeometry(1, 0), comicMat('#eef8ff'), 50, 2, 6);
+  let n = 0; const d = new V3();
+  for (let t = 0; t < 30000 && n < 50; t++) {
+    randDir(d);
+    const lat = Math.abs(d.y);
+    if (lat < 0.9 || lat > 0.97 || iceTag(d) || terrainH(d) > -0.15) continue;
+    const sz = rr(0.05, 0.14);
+    bergs.setMatrixAt(n++, surfaceMatrix(d.clone(), R - sz * 0.3, rand() * TAU, sz, sz * rr(0.6, 1.1), sz * rr(0.7, 1.2)));
+  }
+  finalize(bergs, n);
+}
+
+// ---------- controls & follow cams ----------
+const controls = new OrbitControls(camera, renderer.domElement);
+Object.assign(controls, { enableDamping: true, dampingFactor: 0.08, enablePan: false, minDistance: 11, maxDistance: 60, autoRotate: true, autoRotateSpeed: 0.5 });
+let flyOut = false; // Orbit button pulls the camera back out to a whole-planet view
+controls.addEventListener('start', () => { controls.autoRotate = false; flyOut = false; });
+
+let mode = 'orbit', followIdx = 0;
+const chase = { yaw: 0, pitch: 0.3, dist: 1 };
+const targets = {
+  plane: () => ({ o: planes[followIdx % planes.length], scale: 1.5, look: -0.2 }),
+  car: () => ({ o: cars[followIdx % cars.length], scale: 0.34, look: 0.06 }),
+  boat: () => ({ o: boats[followIdx % boats.length], scale: 0.5, look: 0.06 }),
+  balloon: () => ({ o: balloons[followIdx % balloons.length], scale: 1.1, look: -0.12 }),
+  rocket: () => ({ o: rocket, scale: 1.5, look: 0, camUp: rocket.fwd }),
+  sub: () => ({ o: subs[followIdx % subs.length], scale: 0.75, look: 0.04 }),
+  fish: () => ({ o: allFish[followIdx % allFish.length], scale: 0.2, look: 0.02 }),
+  bird: () => ({ o: allBirds[followIdx % allBirds.length], scale: 0.3, look: 0.02 }),
+  person: () => ({ o: people[followIdx % people.length], scale: 0.26, look: 0.14 }),
+  train: () => ({ o: train, scale: 0.9, look: 0.05 }),
+};
+const hint = document.getElementById('hint');
+const underwater = document.getElementById('underwater');
+const defaultHint = hint.textContent;
+function setMode(m) {
+  if (m === mode && m !== 'orbit') followIdx++;
+  else followIdx = Math.floor(Math.random() * 1000);
+  if ((m === 'boat' && !boats.length) || (m === 'sub' && !subs.length) || (m === 'fish' && !allFish.length) || (m === 'bird' && !allBirds.length)) m = 'orbit';
+  mode = m; driven = null;
+  document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  if (m === 'orbit') {
+    flyOut = true;
+    camera.up.set(0, 1, 0); controls.target.set(0, 0, 0); controls.enabled = true;
+    hint.textContent = defaultHint;
+  } else {
+    controls.enabled = false; controls.autoRotate = false;
+    Object.assign(chase, { yaw: { plane: 0.65, train: 0.7 }[m] ?? 0, pitch: { plane: 0.4, balloon: 0.3, rocket: 1.3, sub: 0.3, person: 0.3, train: 0.35, bird: 0.3, fish: 0.3 }[m] ?? 0.42, dist: 1 });
+    hint.textContent = m === 'person'
+      ? 'Being a person — press WASD to walk · drag to look · scroll to zoom · click again to be someone else'
+      : m === 'train'
+      ? 'Riding the train — press W/S to drive it · T to toot the whistle · drag to look · scroll to zoom'
+      : m === 'bird' || m === 'fish'
+      ? `Being a ${m} — press WASD to take over · drag to look · scroll to zoom · click again to be another ${m}`
+      : `Riding a ${m} — press WASD to take the wheel · drag to look · scroll to zoom · click again to hop to another ${m}`;
+  }
+}
+document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+// number keys pick the mode buttons in order: 1–9, then 0 and -
+const MODE_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-'];
+const modeButtons = [...document.querySelectorAll('[data-mode]')];
+modeButtons.forEach((b, i) => {
+  if (!MODE_KEYS[i]) return;
+  const k = document.createElement('span'); k.className = 'key'; k.textContent = MODE_KEYS[i]; b.append(k);
+  b.dataset.tip += ` (${MODE_KEYS[i]})`;
+});
+addEventListener('keydown', e => {
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  const i = MODE_KEYS.indexOf(e.key);
+  if (i >= 0 && modeButtons[i]) modeButtons[i].click();
+});
+let dayNight = true;
+document.getElementById('daynight').addEventListener('click', e => { dayNight = !dayNight; e.currentTarget.classList.toggle('on', dayNight); });
+document.getElementById('spin').addEventListener('click', e => { spinning = !spinning; e.currentTarget.classList.toggle('on', spinning); });
+const muteBtn = document.getElementById('mute');
+const showMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔊'; muteBtn.classList.toggle('on', !sfx.muted); };
+showMute();
+muteBtn.addEventListener('click', () => {
+  sfx.muted = !sfx.muted;
+  try { localStorage.setItem('planetpop-muted', sfx.muted ? '1' : '0'); } catch { /* not remembered */ }
+  sfxInit();
+  if (sfx.master) sfx.master.gain.setTargetAtTime(sfx.muted ? 0 : 0.8, audioCtx.currentTime, 0.05);
+  showMute();
+});
+document.getElementById('erupt').addEventListener('click', () => {
+  mode = 'volcano'; driven = null;
+  document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('on'));
+  controls.enabled = false; controls.autoRotate = false; flyOut = false;
+  Object.assign(chase, { yaw: 0, pitch: VOLC_CAM_ELEV, dist: 1 }); // pitch = height angle, dist = zoom
+  triggerEruption();
+  hint.textContent = 'KABOOM! Drag to circle and climb · scroll to zoom out · 1 for orbit';
+});
+
+const el = renderer.domElement;
+let dragging = false, lx = 0, ly = 0;
+el.addEventListener('pointerdown', e => { if (mode === 'orbit') return; dragging = true; lx = e.clientX; ly = e.clientY; el.setPointerCapture(e.pointerId); });
+el.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  chase.yaw -= (e.clientX - lx) * 0.006;
+  chase.pitch = clamp(chase.pitch + (e.clientY - ly) * 0.005, -0.2, 1.45);
+  lx = e.clientX; ly = e.clientY;
+});
+el.addEventListener('pointerup', () => dragging = false);
+el.addEventListener('wheel', e => { if (mode !== 'orbit') chase.dist = clamp(chase.dist * Math.exp(e.deltaY * 0.001), 0.35, 6); }, { passive: true });
+
+const _ct = new V3(), _cb = new V3(), _cr = new V3(), _look = new V3(), _dir = new V3();
+const _wpos = new V3(), _wfwd = new V3(), _wup = new V3(), _wcu = new V3(), _wqInv = new THREE.Quaternion();
+// glide the camera toward a world-space target; if it's round the other side of the planet,
+// swing over the top at a safe height rather than cutting straight through
+const _mc = new V3(), _mt = new V3();
+function moveCameraTo(target, k) {
+  _mc.copy(camera.position).normalize(); _mt.copy(target).normalize();
+  if (_mc.dot(_mt) < 0.97 && target.length() < 40) {
+    _mc.lerp(_mt, k).normalize();
+    const len = camera.position.length();
+    camera.position.copy(_mc).multiplyScalar(lerp(len, Math.max(len, 14), k));
+  } else camera.position.lerp(target, k);
+}
+// last line of defence, every frame: keep the camera above the rendered ground (and the sea, unless
+// you're a submarine or fish) and outside the Moon
+function keepCameraOutside() {
+  _mc.copy(camera.position).applyQuaternion(_wqInv);
+  const r = _mc.length(); _mc.divideScalar(r);
+  let floor = groundR(_mc);
+  if (mode !== 'sub' && mode !== 'fish') floor = Math.max(floor, R);
+  floor += 0.03;
+  if (r < floor) camera.position.multiplyScalar(floor / r);
+  if (camera.position.distanceTo(moon.position) < 2.6) camera.position.sub(moon.position).setLength(2.6).add(moon.position);
+}
+function updateCamera(dt) {
+  _wqInv.copy(world.quaternion).invert();
+  camera.fov = lerp(camera.fov, mode === 'volcano' ? 58 : 45, 1 - Math.exp(-dt * 3)); // a wider lens for the eruption
+  if (mode === 'volcano') {
+    // a free camera around the volcano: drag sideways to circle it, drag up/down to change height, scroll to zoom.
+    // It keeps whatever angle you choose and glides there smoothly.
+    const d = VOLC_CAM_DIST * chase.dist, el = clamp(chase.pitch, 0.05, 1.45), az = VOLC.viewAz + chase.yaw;
+    _look.copy(VOLC.dir).multiplyScalar(VOLC_TOP.length() + 0.3); // pivot just above the crater (planet-local)
+    _cb.copy(VOLC.t1).multiplyScalar(Math.cos(az)).addScaledVector(VOLC.t2, Math.sin(az)); // level direction away from the volcano
+    _ct.copy(_look).addScaledVector(_cb, d * Math.cos(el)).addScaledVector(VOLC.dir, d * Math.sin(el));
+    const minR = radiusOf(terrainH(_dir.copy(_ct).normalize())) + 0.2; // never below the hills
+    if (_ct.length() < minR) _ct.setLength(minR);
+    _ct.applyQuaternion(world.quaternion); _look.applyQuaternion(world.quaternion);
+    const k = 1 - Math.exp(-dt * 2.5);
+    moveCameraTo(_ct, k);
+    camera.up.lerp(_wup.copy(VOLC.dir).applyQuaternion(world.quaternion), k).normalize();
+    camera.lookAt(_look);
+    camera.near = 0.02;
+  } else if (mode === 'orbit') {
+    const dist = camera.position.length();
+    const ground = surfaceR(_dir.copy(camera.position).applyQuaternion(_wqInv).normalize());
+    controls.minDistance = ground + 0.3;
+    controls.rotateSpeed = clamp((dist - 10) / 12, 0.03, 0.9);
+    controls.zoomSpeed = clamp((dist - 10) / 7, 0.12, 1.2);
+    if (flyOut) {
+      const len = lerp(dist, 34, 1 - Math.exp(-dt * 2.5));
+      camera.position.setLength(len);
+      if (Math.abs(len - 34) < 0.05) flyOut = false;
+    }
+    controls.update();
+    camera.rotateX(smooth(17, ground + 0.3, dist) * 1.1); // tilt toward the horizon when close
+    camera.near = clamp((dist - ground) * 0.05, 0.005, 0.5);
+  } else {
+    const { o, scale, look, camUp } = targets[mode]();
+    if (driven === o && (keys.f || keys.b || keys.l || keys.r)) chase.yaw = lerp(chase.yaw, mode === 'plane' ? 0.3 : 0, 1 - Math.exp(-dt * 2));
+    const wq = world.quaternion;
+    _wpos.copy(o.pos).applyQuaternion(wq); _wfwd.copy(o.fwd).applyQuaternion(wq); _wup.copy(o.up).applyQuaternion(wq);
+    _wcu.copy(camUp || o.up).applyQuaternion(wq);
+    const d = scale * chase.dist;
+    _cr.crossVectors(_wfwd, _wup).normalize();
+    _cb.copy(_wfwd).multiplyScalar(-Math.cos(chase.yaw)).addScaledVector(_cr, Math.sin(chase.yaw));
+    _ct.copy(_wpos).addScaledVector(_cb, d * Math.cos(chase.pitch)).addScaledVector(_wup, d * Math.sin(chase.pitch));
+    const gh = terrainH(_dir.copy(_ct).applyQuaternion(_wqInv).normalize());
+    const minR = (mode === 'sub' || mode === 'fish' ? seabedR(gh) : radiusOf(gh)) + 0.03; // only the sub and fish cameras may go under water
+    if (_ct.length() < minR) _ct.setLength(minR);
+    if (_ct.distanceTo(moon.position) < 2.7) _ct.sub(moon.position).setLength(2.7).add(moon.position);
+    moveCameraTo(_ct, 1 - Math.exp(-dt * 5));
+    camera.up.lerp(_wcu, 1 - Math.exp(-dt * 5)).normalize();
+    camera.lookAt(_look.copy(_wpos).addScaledVector(_wup, look * scale * Math.min(chase.dist, 1.5)));
+    camera.near = clamp(d * 0.02, 0.004, 0.2);
+  }
+  keepCameraOutside();
+  camera.updateProjectionMatrix();
+  atmoMat.uniforms.uFade.value = smooth(13.8, 20, camera.position.length());
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.getDrawingBufferSize(U.uRes.value);
+});
+
+// ---------- going easy on the computer ----------
+const _cd = new V3(), lastCull = { dir: new V3(), dist: 0 };
+const CULL_MARGIN = { pieces: 0.4, instances: 0.18 }; // radians of safety beyond the horizon
+function snapshotInstances(m) { // remember every instance once, so visible ones can be re-packed at the front
+  const n = m.count, mats = m.instanceMatrix.array.slice(0, n * 16), cols = m.instanceColor ? m.instanceColor.array.slice(0, n * 3) : null;
+  const dirs = new Float32Array(n * 3), extra = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = mats[i * 16 + 12], y = mats[i * 16 + 13], z = mats[i * 16 + 14], l = Math.hypot(x, y, z) || 1;
+    dirs[i * 3] = x / l; dirs[i * 3 + 1] = y / l; dirs[i * 3 + 2] = z / l;
+    extra[i] = Math.acos(Math.min(1, 9.3 / (l + 0.3))); // things standing high (a tree on a mountain) peek over the horizon from further round
+  }
+  return { n, mats, cols, dirs, extra };
+}
+function cullToHorizon() {
+  _cd.copy(camera.position).applyQuaternion(_wqInv);
+  const dist = _cd.length(); _cd.divideScalar(dist);
+  // terrain and ocean pieces: hide those entirely beyond the horizon (generous margin for mountains)
+  // the planet's ink outline is drawn by faces just *past* the visible edge, so keep a wide margin
+  const hz = Math.acos(clamp(8.2 / dist, -1, 1)) + CULL_MARGIN.pieces;
+  for (const h of horizonMeshes) h.mesh.visible = angle(h.dir, _cd) - h.spread < hz;
+  // decoration: re-pack only the instances on the visible side, but only once the camera has moved a little
+  if (lastCull.dist && lastCull.dir.dot(_cd) > 0.9998 && Math.abs(dist - lastCull.dist) < dist * 0.02) return;
+  lastCull.dir.copy(_cd); lastCull.dist = dist;
+  const reach = Math.max(Math.acos(clamp(9.3 / dist, -1, 1)) + CULL_MARGIN.instances, 0.55);
+  for (const m of cullableInstances) {
+    const u = m.userData.cull ||= snapshotInstances(m), dst = m.instanceMatrix.array, cd = m.instanceColor && m.instanceColor.array;
+    let w = 0;
+    for (let i = 0; i < u.n; i++) {
+      const dot = u.dirs[i * 3] * _cd.x + u.dirs[i * 3 + 1] * _cd.y + u.dirs[i * 3 + 2] * _cd.z;
+      if (Math.acos(clamp(dot, -1, 1)) > reach + u.extra[i]) continue;
+      dst.set(u.mats.subarray(i * 16, i * 16 + 16), w * 16); // always from the saved originals: slots get reused
+      if (cd) cd.set(u.cols.subarray(i * 3, i * 3 + 3), w * 3);
+      w++;
+    }
+    m.count = w; m.children.forEach(c => c.count = w);
+    m.instanceMatrix.needsUpdate = true; if (cd) m.instanceColor.needsUpdate = true;
+  }
+}
+function applyQuality(level) {
+  quality = level;
+  const q = QUALITY[level];
+  renderer.setPixelRatio(Math.min(devicePixelRatio, q.dpr));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.getDrawingBufferSize(U.uRes.value);
+  U.uDot.value = 5 * renderer.getPixelRatio();
+  for (const m of liteMeshes) m.visible = !q.lite;
+}
+applyQuality(quality);
+// Watch how fast frames actually arrive. If they're well below the frame cap for 4 seconds, step down a level;
+// if they're comfortably on time for 20 seconds, try one level up again (but never above where we started).
+const perf = { windowStart: 0, frames: 0, sum: 0, slow: 0, fast: 0, floor: quality };
+function watchPerformance(now, interval) {
+  if (interval > 250) return; // a stall (tab switch, pause): ignore
+  perf.frames++; perf.sum += interval;
+  if (now - perf.windowStart < 2000) return;
+  const avg = perf.sum / perf.frames, target = 1000 / QUALITY[quality].fps;
+  perf.windowStart = now; perf.frames = 0; perf.sum = 0;
+  if (avg > target * 1.35) {
+    perf.fast = 0;
+    if (++perf.slow >= 2 && quality < QUALITY.length - 1) {
+      if (perf.triedUp) perf.floor = quality + 1; // stepping up didn't work out: stay down from now on (no see-sawing)
+      applyQuality(quality + 1); perf.slow = 0;
+    }
+  }
+  else if (avg < target * 1.1) { perf.slow = 0; if (++perf.fast >= 10 && quality > perf.floor) { applyQuality(quality - 1); perf.fast = 0; perf.triedUp = true; } }
+  else { perf.slow = 0; perf.fast = 0; }
+}
+// Pause whenever the window isn't in focus (e.g. you've clicked over to Teams), so the game never competes with other apps.
+let paused = false, lastFrameAt = 0;
+const pausedEl = document.getElementById('paused');
+function setPaused(p) {
+  if (paused === p) return;
+  paused = p; pausedEl.hidden = !p;
+  if (audioCtx) { if (p) audioCtx.suspend(); else if (!sfx.muted) audioCtx.resume(); }
+  if (!p) { clock.getDelta(); lastFrameAt = 0; } // don't count the paused time as one giant frame
+}
+addEventListener('blur', () => setPaused(true));
+addEventListener('focus', () => setPaused(false));
+pausedEl.addEventListener('click', () => setPaused(false));
+
+// ---------- loop ----------
+const clock = new THREE.Clock();
+let time = 0, sunAngle = 0.6;
+renderer.setAnimationLoop(now => {
+  if (paused) return;
+  // frame cap: 60 (or 30 at the lower levels), even on fast 120 Hz screens
+  if (lastFrameAt && now - lastFrameAt < 1000 / QUALITY[quality].fps - 2) return;
+  if (lastFrameAt) watchPerformance(now, now - lastFrameAt);
+  lastFrameAt = now;
+  const dt = Math.min(clock.getDelta(), 0.05); time += dt;
+  U.uTime.value = time;
+  if (dayNight) sunAngle += dt * TAU / 120;
+  U.uLight.value.set(Math.cos(sunAngle), 0.35, Math.sin(sunAngle)).normalize();
+  sun.position.copy(U.uLight.value).multiplyScalar(170);
+  sun.userData.rays.forEach(r => r.rotation.z = time * 0.15);
+  if (spinning) world.rotation.y += dt * TAU / 90;
+  world.updateMatrixWorld();
+  moonAngle += dt * MOON_W;
+  moonAt(moonAngle, moon.position);
+  moon.lookAt(0, 0, 0);
+  moon.updateMatrixWorld();
+  updateRocket(dt, time);
+  updateSubs(dt, time); updateFish(dt, time);
+  updatePeople(dt, time); updateVolcano(dt, time); updateKnocks(); updateTrain(dt, time); updateBirds(dt, time);
+  updateCars(dt); updateBoats(dt, time); updateClouds(dt); updatePlanes(dt, time); updateBalloons(dt, time);
+  for (const w of windmills) w.hub.rotation.z += w.speed * dt;
+  updateCamera(dt);
+  cullToHorizon();
+  updateSound();
+  if (bigEruption > 0) {
+    const d = camera.position.distanceTo(_look.copy(VOLC_TOP).applyQuaternion(world.quaternion));
+    const amp = 0.012 * clamp(1 - (d - 3) / 18, 0, 1) * Math.min(1, bigEruption / 2);
+    camera.rotateX((Math.random() - 0.5) * amp); camera.rotateY((Math.random() - 0.5) * amp);
+  }
+  const under = camera.position.length() < R;
+  for (const ink of oceanInks) ink.visible = !under;
+  underwater.style.opacity = under ? 1 : 0;
+  sun.lookAt(camera.position);
+  renderer.render(scene, camera);
+});
+document.getElementById('loading').remove();
+</script>
+</body>
+</html>
