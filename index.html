@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Planet Pop</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
@@ -13,12 +13,12 @@
   /* fonts are served from this site (vendor/fonts, SIL Open Font License), so no visitor data goes to a third party */
   @font-face { font-family: 'Bangers'; font-style: normal; font-weight: 400; font-display: swap; src: url(vendor/fonts/bangers-latin.woff2) format('woff2'); }
   @font-face { font-family: 'Comic Neue'; font-style: normal; font-weight: 700; font-display: swap; src: url(vendor/fonts/comic-neue-700-latin.woff2) format('woff2'); }
-  html, body { margin: 0; height: 100%; overflow: hidden; }
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; } /* no pull-to-refresh or bounce on phones */
   body {
     background: radial-gradient(circle at 28% 25%, #4a34b8 0%, #251a6e 40%, #0d0930 100%);
     font-family: 'Comic Neue', 'Comic Sans MS', sans-serif;
     color: #fff;
-    user-select: none;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
   }
   #dots {
     position: fixed; inset: 0; pointer-events: none;
@@ -26,7 +26,11 @@
     background-size: 11px 11px;
   }
   canvas { position: fixed; inset: 0; display: block; touch-action: none; }
-  #ui { position: fixed; z-index: 10; left: 16px; top: 14px; right: 16px; pointer-events: none; }
+  /* env(safe-area-inset-*) keeps things clear of phone notches and rounded corners */
+  #ui {
+    position: fixed; z-index: 10; pointer-events: none;
+    left: max(16px, env(safe-area-inset-left)); top: max(14px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right));
+  }
   .logo {
     font-family: 'Bangers', Impact, sans-serif; font-size: clamp(34px, 6vw, 58px); letter-spacing: 2px;
     color: #ffe14d; -webkit-text-stroke: 2px #140d33;
@@ -41,13 +45,16 @@
     background: #fff; color: #140d33; border: 3px solid #140d33; border-radius: 12px;
     box-shadow: 4px 4px 0 #140d33; cursor: pointer;
     transition: transform .08s, box-shadow .08s;
+    touch-action: none; /* taps still click, but a pinch or double-tap on a button doesn't zoom the page */
   }
-  button[data-tip]:hover::after {
-    content: attr(data-tip); position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
-    white-space: nowrap; background: #140d33; color: #fff; font: 700 13px 'Comic Neue', sans-serif;
-    padding: 4px 9px; border-radius: 8px; pointer-events: none; z-index: 20;
+  @media (hover: hover) { /* only where there's a real mouse: on touch screens a tap would leave the tooltip stuck */
+    button[data-tip]:hover::after {
+      content: attr(data-tip); position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+      white-space: nowrap; background: #140d33; color: #fff; font: 700 13px 'Comic Neue', sans-serif;
+      padding: 4px 9px; border-radius: 8px; pointer-events: none; z-index: 20;
+    }
+    button:hover { transform: translate(-1px,-1px); box-shadow: 5px 5px 0 #140d33; }
   }
-  button:hover { transform: translate(-1px,-1px); box-shadow: 5px 5px 0 #140d33; }
   button:active { transform: translate(3px,3px); box-shadow: 1px 1px 0 #140d33; }
   button.on { background: #ffe14d; }
   button .key {
@@ -55,7 +62,7 @@
     border-radius: 9px; background: #140d33; color: #fff; font: 700 11px/18px 'Comic Neue', sans-serif; text-align: center;
   }
   #hint {
-    position: fixed; z-index: 10; left: 50%; bottom: 16px; transform: translateX(-50%);
+    position: fixed; z-index: 10; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%);
     background: #fff; color: #140d33; border: 3px solid #140d33; border-radius: 18px;
     padding: 7px 16px; font-size: 15px; box-shadow: 4px 4px 0 #140d33; max-width: calc(100vw - 60px);
     text-align: center; pointer-events: none;
@@ -87,9 +94,54 @@
   }
   #paused[hidden] { display: none; } /* the display: grid above would otherwise override the hidden attribute */
   #paused small { display: block; font: 700 16px 'Comic Neue', sans-serif; color: #fff; -webkit-text-stroke: 0; text-shadow: none; margin-top: 6px; }
+
+  /* ---- touch screens: a steering stick on the left, hold buttons on the right ----
+     body.touch is set by the script on touch-first devices (or the first time someone touches the screen),
+     and body[data-view] says what you're riding, so each mode shows only the buttons it uses. */
+  body.touch button .key { display: none; } /* number-key badges mean nothing without a keyboard */
+  #touch { position: fixed; inset: 0; z-index: 10; pointer-events: none; display: none; }
+  body.touch:not([data-view="orbit"]):not([data-view="volcano"]) #touch { display: block; }
+  #stick {
+    position: absolute; left: calc(20px + env(safe-area-inset-left)); bottom: calc(20px + env(safe-area-inset-bottom));
+    width: 124px; height: 124px; box-sizing: border-box; border-radius: 50%;
+    background: rgba(255, 255, 255, .3); border: 3px solid #140d33; box-shadow: 4px 4px 0 #140d33;
+    pointer-events: auto; touch-action: none;
+  }
+  #stick .knob {
+    position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px; box-sizing: border-box; border-radius: 50%;
+    background: #ffe14d; border: 3px solid #140d33; box-shadow: 3px 3px 0 #140d33; pointer-events: none;
+  }
+  #stick.held .knob { background: #ff4d8d; }
+  body[data-view="rocket"] #stick { display: none; } /* the rocket flies itself */
+  #tbtns {
+    position: absolute; right: calc(20px + env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom));
+    display: grid; grid-template-columns: 60px 60px; grid-template-rows: 60px 60px; gap: 12px; pointer-events: none;
+  }
+  #tbtns button { display: none; width: 60px; height: 60px; font-size: 28px; border-radius: 50%; pointer-events: auto; }
+  #t-rise { grid-area: 1 / 1; } #t-dive, #t-horn { grid-area: 2 / 1; } #t-boost, #t-launch { grid-area: 2 / 2; }
+  body:not([data-view="rocket"]) #t-boost,
+  body[data-view="sub"] :is(#t-rise, #t-dive), body[data-view="fish"] :is(#t-rise, #t-dive),
+  body[data-view="train"] #t-horn, body[data-view="boat"] #t-horn,
+  body[data-view="rocket"] #t-launch.ready { display: grid; }
+  /* keep the hint clear of the stick: above it when the phone is upright, between the controls when it's sideways */
+  body.touch:not([data-view="orbit"]):not([data-view="volcano"]) #hint { bottom: calc(172px + env(safe-area-inset-bottom)); }
+  @media (orientation: landscape) {
+    body.touch:not([data-view="orbit"]):not([data-view="volcano"]) #hint { bottom: calc(16px + env(safe-area-inset-bottom)); max-width: calc(100vw - 340px); }
+  }
+
+  /* small screens (phones, either way up): smaller logo and buttons so the view isn't covered */
+  @media (max-width: 700px), (max-height: 500px) {
+    #ui { left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); }
+    .logo { font-size: 30px; -webkit-text-stroke-width: 1.5px; text-shadow: 3px 3px 0 #ff4d8d, 5px 5px 0 #140d33; }
+    .btns { gap: 5px; margin-top: 6px; } /* eight to a row on a typical phone held upright */
+    .btns button { width: 40px; height: 40px; font-size: 20px; border-width: 2.5px; border-radius: 10px; box-shadow: 3px 3px 0 #140d33; }
+    .btns button:active { box-shadow: 1px 1px 0 #140d33; }
+    .btns button svg { width: 25px; height: 25px; }
+    #hint { font-size: 13px; padding: 6px 12px; border-radius: 14px; }
+  }
 </style>
 </head>
-<body>
+<body data-view="orbit">
 <div id="dots"></div>
 <div id="underwater"></div>
 <div id="loading">Building a world…</div>
@@ -115,6 +167,16 @@
   </div>
 </div>
 <div id="hint">Drag to spin · scroll / pinch to zoom · zoom right in to tilt toward the horizon</div>
+<div id="touch">
+  <div id="stick" aria-label="Steering stick"><div class="knob"></div></div>
+  <div id="tbtns">
+    <button id="t-rise" data-hold="rise" aria-label="Rise">⬆️</button>
+    <button id="t-dive" data-hold="dive" aria-label="Dive">⬇️</button>
+    <button id="t-horn" aria-label="Horn / whistle">📣</button>
+    <button id="t-boost" data-hold="boost" aria-label="Boost">⚡</button>
+    <button id="t-launch" aria-label="Launch the rocket now">🔥</button>
+  </div>
+</div>
 
 <script type="importmap">
 { "imports": {
@@ -378,6 +440,14 @@ scene.add(world);
 let spinning = false;
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 420);
 camera.position.set(0, 9, 34);
+// A phone held upright is tall and narrow, so a 45° lens would crop the planet's sides. On screens taller than they
+// are wide, open the lens up so the view is as wide as it would be on a square screen (capped, to limit distortion).
+const DEG = 180 / Math.PI;
+function lensFor(fov) {
+  const a = camera.aspect;
+  return a >= 1 ? fov : Math.min(80, 2 * DEG * Math.atan(Math.tan(fov / 2 / DEG) / a));
+}
+camera.fov = lensFor(45); camera.updateProjectionMatrix();
 
 const U = {
   uLight: { value: new V3(1, 0.35, 0.5).normalize() },
@@ -1629,7 +1699,7 @@ function joinFlock(b, f) {
   _jc.copy(f.up).multiplyScalar(f.alt + b.o.y).addScaledVector(_jr, b.o.x).addScaledVector(f.fwd, b.o.z);
   b.av.subVectors(b.pos, _jc); // start from where we are; this offset eases away to nothing
   b.joining = 1.5; b.manual = false; b.idle = 0;
-  if (b === driven) { driven = null; hint.textContent = 'You joined a flock! Press WASD to fly off on your own again'; }
+  if (b === driven) { driven = null; say('You joined a flock! Press WASD to fly off on your own again', 'You joined a flock! Use the stick to fly off on your own again'); }
 }
 function updateBirds(dt, time) {
   const joins = [];
@@ -2150,7 +2220,8 @@ function updateRocket(dt, time) {
   if (r.state === 'pad' || r.state === 'count') {
     padFrame(r.pos, r.fwd);
     if (r.state === 'pad') {
-      label = 'On the launch pad, waiting for the Moon to rise overhead · press W to launch now';
+      label = touchUI ? 'On the launch pad, waiting for the Moon to rise overhead · tap 🔥 to launch now'
+        : 'On the launch pad, waiting for the Moon to rise overhead · press W to launch now';
       if (r.timer > 6 && launchWindow()) setRocket('count');
     } else {
       const left = COUNT - r.timer;
@@ -2184,21 +2255,28 @@ function updateRocket(dt, time) {
     if (r.emit <= 0) { r.emit = 0.035; spawnPuff(_bp.copy(r.pos).addScaledVector(r.fwd, -0.45 - rand() * 0.15), 0.08 * flame, 3, 1.3); }
   }
   if (mode === 'rocket' && hint.textContent !== label) hint.textContent = label;
+  if (mode === 'rocket' && touchUI) launchBtn.classList.toggle('ready', r.state === 'pad'); // 🔥 only while it's on the pad
 }
 
-// ---------- manual driving (WASD) ----------
+// ---------- manual driving (WASD, or the touch stick) ----------
+// `keys` holds what's pressed: true/false from the keyboard, or 0–1 from the touch stick (how far it's pushed)
 const keys = {};
 const KEYMAP = { KeyW: 'f', ArrowUp: 'f', KeyS: 'b', ArrowDown: 'b', KeyA: 'l', ArrowLeft: 'l', KeyD: 'r', ArrowRight: 'r', ShiftLeft: 'boost', ShiftRight: 'boost', KeyQ: 'dive', KeyE: 'rise' };
-let driven = null; // the vehicle currently under keyboard control
+let driven = null; // the vehicle currently under your control
+let touchUI = false; // touch controls showing (set in the touch controls section): hints then talk about the stick, not keys
+function say(keysText, touchText) { hint.textContent = touchUI ? touchText : keysText; }
+// steering (a key or the stick) takes over whatever you're riding; W on the rocket's launch pad launches it early
+function grab() { if (mode !== 'orbit' && mode !== 'volcano' && mode !== 'rocket') takeControl(targets[mode]().o); }
+function launchEarly() { if (mode === 'rocket' && rocket.state === 'pad') setRocket('count', COUNT - 3); }
 addEventListener('keydown', e => {
   const k = KEYMAP[e.code]; if (!k) return;
   keys[k] = true; e.preventDefault();
-  if (mode === 'rocket') { if (k === 'f' && rocket.state === 'pad') setRocket('count', COUNT - 3); }
-  else if (mode !== 'orbit' && mode !== 'volcano' && k !== 'boost') takeControl(targets[mode]().o);
+  if (mode === 'rocket') { if (k === 'f') launchEarly(); }
+  else if (k !== 'boost') grab();
 });
 addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) keys[k] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-const axis = (a, b) => (keys[a] ? 1 : 0) - (keys[b] ? 1 : 0);
+const axis = (a, b) => (+keys[a] || 0) - (+keys[b] || 0); // -1…1; in between when the stick is only partly pushed
 
 function takeControl(o) {
   if (driven === o) return;
@@ -2211,22 +2289,30 @@ function takeControl(o) {
     if (mode === 'fish') o.depth = R - o.pos.length();
     o.alt = o.pos.length();
   }
-  hint.textContent = mode === 'plane'
-    ? 'Flying! A/D turn · W climb · S dive · Shift boost · drag to look around'
-    : mode === 'bird'
-    ? 'Flying! A/D turn · W climb · S dive · Shift speed up · drag to look around'
-    : mode === 'fish'
-    ? 'Swimming! W swim · A/D turn · Q dive · E rise (and leap at the surface) · Shift dash · drag to look around'
-    : mode === 'train'
-    ? 'All aboard! W faster · S slower (and reverse) · T toot toot · Shift full steam · drag to look around'
-    : mode === 'person'
-    ? 'Walking! W/S walk · A/D turn · Shift run · wade into the sea to swim · drag to look around'
-    : mode === 'sub'
-    ? 'Submarine! W/S throttle · A/D steer · Q dive · E surface · Shift boost · drag to look around'
-    : mode === 'balloon'
-    ? 'Ballooning! W fire the burner · S vent · A/D steer the drift · Shift tailwind · drag to look around'
-    : `Driving! W/S throttle · A/D steer · Shift boost · drag to look around`;
+  driveHint();
 }
+function driveHint() { const [k, t] = DRIVE_HINTS[mode] || DRIVE_HINTS.car; say(k, t); }
+// [keyboard, touch] hints once you've taken control
+const DRIVE_HINTS = {
+  plane: ['Flying! A/D turn · W climb · S dive · Shift boost · drag to look around',
+    'Flying! Stick up to climb, down to dive, sideways to turn · ⚡ boost · drag to look around'],
+  bird: ['Flying! A/D turn · W climb · S dive · Shift speed up · drag to look around',
+    'Flying! Stick up to climb, down to dive, sideways to turn · ⚡ speed up · drag to look around'],
+  fish: ['Swimming! W swim · A/D turn · Q dive · E rise (and leap at the surface) · Shift dash · drag to look around',
+    'Swimming! Stick up to swim, sideways to turn · ⬇️ dive · ⬆️ rise (and leap at the surface) · ⚡ dash'],
+  train: ['All aboard! W faster · S slower (and reverse) · T toot toot · Shift full steam · drag to look around',
+    'All aboard! Stick up: faster · down: slower (and reverse) · 📣 toot toot · ⚡ full steam'],
+  person: ['Walking! W/S walk · A/D turn · Shift run · wade into the sea to swim · drag to look around',
+    'Walking! Stick to walk and turn · ⚡ run · wade into the sea to swim · drag to look around'],
+  sub: ['Submarine! W/S throttle · A/D steer · Q dive · E surface · Shift boost · drag to look around',
+    'Submarine! Stick to throttle and steer · ⬇️ dive · ⬆️ surface · ⚡ boost · drag to look around'],
+  balloon: ['Ballooning! W fire the burner · S vent · A/D steer the drift · Shift tailwind · drag to look around',
+    'Ballooning! Stick up: burner · down: vent · sideways: steer the drift · ⚡ tailwind'],
+  boat: ['Driving! W/S throttle · A/D steer · Shift boost · drag to look around',
+    'Sailing! Stick to throttle and steer · ⚡ boost · 📣 horn · drag to look around'],
+  car: ['Driving! W/S throttle · A/D steer · Shift boost · drag to look around',
+    'Driving! Stick to throttle and steer · ⚡ boost · drag to look around'],
+};
 
 const CAR_DRIVE = { acc: 1.4, max: 1.1, turn: 2.4, lift: 0.012, ok: h => h >= 0, solid: true, cars: true };
 // subs can go anywhere with enough water to float; if the water ahead is shallower than we're deep, climb over the rise
@@ -2431,12 +2517,16 @@ function toot(withSound = true) {
   train.toots = TOOTS.map(([start, len]) => [time + start, time + start + len]);
   if (withSound) playWhistle();
 }
-// T (or Space): the train toots its whistle, a boat hoots its horn
+// T (or Space, or the 📣 touch button): the train toots its whistle, a boat hoots its horn
+function horn() {
+  if (mode !== 'train' && mode !== 'boat') return;
+  sfxInit();
+  if (mode === 'train') toot(); else hoot(targets.boat().o);
+}
 addEventListener('keydown', e => {
   if ((mode !== 'train' && mode !== 'boat') || (e.code !== 'KeyT' && e.code !== 'Space') || e.repeat) return;
   e.preventDefault();
-  sfxInit();
-  if (mode === 'train') toot(); else hoot(targets.boat().o);
+  horn();
 });
 const _ts = new V3();
 function updateTrain(dt, time) {
@@ -2504,6 +2594,7 @@ function sfxInit() {
   sfx.lfo.connect(sfx.lfoDepth).connect(am.gain); sfx.lfo.start(); // flutter / putt-putt / cylinder beat
 }
 addEventListener('pointerdown', sfxInit);
+addEventListener('pointerup', sfxInit); // phones only count a tap as permission for sound once the finger lifts
 addEventListener('keydown', sfxInit);
 // one-off sounds
 function sfxBurst({ at = audioCtx.currentTime, dur = 0.1, type = 'bandpass', freq = 800, q = 1, gain = 0.1, attack = 0.01 }) {
@@ -2723,6 +2814,7 @@ function setMode(m) {
   else followIdx = Math.floor(Math.random() * 1000);
   if ((m === 'boat' && !boats.length) || (m === 'sub' && !subs.length) || (m === 'fish' && !allFish.length) || (m === 'bird' && !allBirds.length)) m = 'orbit';
   mode = m; driven = null;
+  document.body.dataset.view = m; // the touch controls show the buttons each mode uses
   document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
   if (m === 'orbit') {
     flyOut = true;
@@ -2731,14 +2823,20 @@ function setMode(m) {
   } else {
     controls.enabled = false; controls.autoRotate = false;
     Object.assign(chase, { yaw: { plane: 0.65, train: 0.7 }[m] ?? 0, pitch: { plane: 0.4, balloon: 0.3, rocket: 1.3, sub: 0.3, person: 0.3, train: 0.35, bird: 0.3, fish: 0.3 }[m] ?? 0.42, dist: 1 });
-    hint.textContent = m === 'person'
-      ? 'Being a person — press WASD to walk · drag to look · scroll to zoom · click again to be someone else'
-      : m === 'train'
-      ? 'Riding the train — press W/S to drive it · T to toot the whistle · drag to look · scroll to zoom'
-      : m === 'bird' || m === 'fish'
-      ? `Being a ${m} — press WASD to take over · drag to look · scroll to zoom · click again to be another ${m}`
-      : `Riding a ${m} — press WASD to take the wheel · drag to look · scroll to zoom · click again to hop to another ${m}`;
+    rideHint();
   }
+}
+// what to do now you're riding (or being) something, before you take control
+function rideHint() {
+  const m = mode;
+  if (m === 'person') say('Being a person — press WASD to walk · drag to look · scroll to zoom · click again to be someone else',
+    'Being a person — use the stick to walk · drag to look · pinch to zoom · tap 🚶 again to be someone else');
+  else if (m === 'train') say('Riding the train — press W/S to drive it · T to toot the whistle · drag to look · scroll to zoom',
+    'Riding the train — push the stick up or down to drive it · 📣 toots the whistle · drag to look · pinch to zoom');
+  else if (m === 'bird' || m === 'fish') say(`Being a ${m} — press WASD to take over · drag to look · scroll to zoom · click again to be another ${m}`,
+    `Being a ${m} — use the stick to take over · drag to look · pinch to zoom · tap again to be another ${m}`);
+  else say(`Riding a ${m} — press WASD to take the wheel · drag to look · scroll to zoom · click again to hop to another ${m}`,
+    `Riding a ${m} — use the stick to take the wheel · drag to look · pinch to zoom · tap again to hop to another ${m}`);
 }
 document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
 // number keys pick the mode buttons in order: 1–9, then 0 and -
@@ -2768,25 +2866,98 @@ muteBtn.addEventListener('click', () => {
   showMute();
 });
 document.getElementById('erupt').addEventListener('click', () => {
-  mode = 'volcano'; driven = null;
+  mode = 'volcano'; driven = null; document.body.dataset.view = mode;
   document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('on'));
   controls.enabled = false; controls.autoRotate = false; flyOut = false;
   Object.assign(chase, { yaw: 0, pitch: VOLC_CAM_ELEV, dist: 1 }); // pitch = height angle, dist = zoom
   triggerEruption();
-  hint.textContent = 'KABOOM! Drag to circle and climb · scroll to zoom out · 1 for orbit';
+  say('KABOOM! Drag to circle and climb · scroll to zoom out · 1 for orbit', 'KABOOM! Drag to circle and climb · pinch to zoom out · 🌍 for orbit');
 });
 
+// riding cameras: drag with one finger (or the mouse) to look around; pinch with two fingers, or scroll, to zoom
 const el = renderer.domElement;
-let dragging = false, lx = 0, ly = 0;
-el.addEventListener('pointerdown', e => { if (mode === 'orbit') return; dragging = true; lx = e.clientX; ly = e.clientY; el.setPointerCapture(e.pointerId); });
-el.addEventListener('pointermove', e => {
-  if (!dragging) return;
-  chase.yaw -= (e.clientX - lx) * 0.006;
-  chase.pitch = clamp(chase.pitch + (e.clientY - ly) * 0.005, -0.2, 1.45);
-  lx = e.clientX; ly = e.clientY;
+const fingers = new Map(); // pointerId -> last { x, y }
+let pinchFrom = 0; // finger spacing at the last move of a pinch
+el.addEventListener('pointerdown', e => {
+  if (mode === 'orbit') return; // OrbitControls has its own drag and pinch
+  fingers.set(e.pointerId, { x: e.clientX, y: e.clientY }); el.setPointerCapture(e.pointerId);
+  pinchFrom = 0;
 });
-el.addEventListener('pointerup', () => dragging = false);
+el.addEventListener('pointermove', e => {
+  const p = fingers.get(e.pointerId); if (!p) return;
+  if (fingers.size === 1) {
+    chase.yaw -= (e.clientX - p.x) * 0.006;
+    chase.pitch = clamp(chase.pitch + (e.clientY - p.y) * 0.005, -0.2, 1.45);
+  }
+  p.x = e.clientX; p.y = e.clientY;
+  if (fingers.size === 2) {
+    const [a, b] = fingers.values(), d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinchFrom && d > 0) chase.dist = clamp(chase.dist * pinchFrom / d, 0.35, 6); // fingers apart = closer
+    pinchFrom = d;
+  }
+});
+const liftFinger = e => { fingers.delete(e.pointerId); pinchFrom = 0; };
+el.addEventListener('pointerup', liftFinger); el.addEventListener('pointercancel', liftFinger);
 el.addEventListener('wheel', e => { if (mode !== 'orbit') chase.dist = clamp(chase.dist * Math.exp(e.deltaY * 0.001), 0.35, 6); }, { passive: true });
+
+// ---------- touch controls: a steering stick and hold buttons that press the same `keys` as the keyboard ----------
+// They show on touch-first devices, or as soon as someone touches the screen (a laptop with a touch screen).
+const stick = document.getElementById('stick'), knob = stick.firstElementChild, launchBtn = document.getElementById('t-launch');
+function useTouchUI() {
+  if (touchUI) return;
+  touchUI = true; document.body.classList.add('touch');
+  document.querySelector('#paused small').textContent = "so it doesn't slow down your other apps · tap to carry on";
+  if (mode !== 'orbit' && mode !== 'volcano' && mode !== 'rocket') { if (driven) driveHint(); else rideHint(); } // swap key hints for stick ones
+}
+if (matchMedia('(pointer: coarse)').matches) useTouchUI();
+addEventListener('pointerdown', e => { if (e.pointerType === 'touch') useTouchUI(); }, true);
+// iPhones and iPads pinch-zoom the whole page unless told not to; the game does its own zooming
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.getElementById('touch').addEventListener('contextmenu', e => e.preventDefault()); // no long-press menu
+
+// The stick: how far it's pushed (past a small dead zone) sets keys f/b (up/down) and l/r (left/right), 0–1 each.
+const STICK_TRAVEL = 46, STICK_DEAD = 0.15;
+let stickId = null, stickX = 0, stickY = 0; // the finger on it, and the stick's centre on screen
+const stickAxis = v => Math.max(0, (Math.abs(v) - STICK_DEAD) / (1 - STICK_DEAD));
+function moveStick(x, y) {
+  let dx = (x - stickX) / STICK_TRAVEL, dy = (y - stickY) / STICK_TRAVEL;
+  const len = Math.hypot(dx, dy);
+  if (len > 1) { dx /= len; dy /= len; }
+  knob.style.transform = `translate(${dx * STICK_TRAVEL}px, ${dy * STICK_TRAVEL}px)`;
+  keys.l = dx < 0 ? stickAxis(dx) : 0; keys.r = dx > 0 ? stickAxis(dx) : 0;
+  keys.f = dy < 0 ? stickAxis(dy) : 0; keys.b = dy > 0 ? stickAxis(dy) : 0;
+}
+function releaseStick() {
+  if (stickId === null) return;
+  stickId = null; stick.classList.remove('held'); knob.style.transform = '';
+  keys.f = keys.b = keys.l = keys.r = 0;
+}
+stick.addEventListener('pointerdown', e => {
+  if (stickId !== null) return;
+  stickId = e.pointerId; stick.setPointerCapture(e.pointerId); stick.classList.add('held');
+  const r = stick.getBoundingClientRect(); stickX = r.left + r.width / 2; stickY = r.top + r.height / 2;
+  moveStick(e.clientX, e.clientY);
+  grab();
+});
+stick.addEventListener('pointermove', e => {
+  if (e.pointerId !== stickId) return;
+  moveStick(e.clientX, e.clientY);
+  if (!driven) grab(); // still holding the stick after switching to another ride (or leaving a flock): take that one too
+});
+for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) stick.addEventListener(type, e => { if (e.pointerId === stickId) releaseStick(); });
+addEventListener('blur', releaseStick);
+// hold buttons: ⚡ boost, ⬆️ rise, ⬇️ dive (like Shift, E and Q)
+for (const b of document.querySelectorAll('#tbtns [data-hold]')) {
+  const k = b.dataset.hold;
+  const up = () => { keys[k] = false; b.classList.remove('on'); };
+  b.addEventListener('pointerdown', e => {
+    b.setPointerCapture(e.pointerId); keys[k] = true; b.classList.add('on');
+    if (k !== 'boost') grab();
+  });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(type, up);
+}
+document.getElementById('t-horn').addEventListener('click', horn);
+launchBtn.addEventListener('click', launchEarly);
 
 const _ct = new V3(), _cb = new V3(), _cr = new V3(), _look = new V3(), _dir = new V3();
 const _wpos = new V3(), _wfwd = new V3(), _wup = new V3(), _wcu = new V3(), _wqInv = new THREE.Quaternion();
@@ -2814,7 +2985,7 @@ function keepCameraOutside() {
 }
 function updateCamera(dt) {
   _wqInv.copy(world.quaternion).invert();
-  camera.fov = lerp(camera.fov, mode === 'volcano' ? 58 : 45, 1 - Math.exp(-dt * 3)); // a wider lens for the eruption
+  camera.fov = lerp(camera.fov, lensFor(mode === 'volcano' ? 58 : 45), 1 - Math.exp(-dt * 3)); // a wider lens for the eruption
   if (mode === 'volcano') {
     // a free camera around the volcano: drag sideways to circle it, drag up/down to change height, scroll to zoom.
     // It keeps whatever angle you choose and glides there smoothly.
@@ -2952,6 +3123,8 @@ function setPaused(p) {
 }
 addEventListener('blur', () => setPaused(true));
 addEventListener('focus', () => setPaused(false));
+// phones don't always send blur when you switch apps or lock the screen, but the page does get hidden
+document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });
 pausedEl.addEventListener('click', () => setPaused(false));
 
 // ---------- loop ----------
